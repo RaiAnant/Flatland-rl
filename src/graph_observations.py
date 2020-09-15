@@ -15,6 +15,7 @@ import queue
 import numpy as np
 from collections import defaultdict
 import math
+import copy
 
 from flatland.core.env import Environment
 from flatland.core.env_observation_builder import ObservationBuilder
@@ -111,7 +112,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                 for ts in range(self.max_prediction_depth):
                     pos_list.append(self.predicted_pos[ts][a])  # Use int positions
                 self.predicted_pos_list.update({a: pos_list})
-
+        """
         observations = {}
         for a in handles:
             # TODO: Instead of below existing get()
@@ -150,6 +151,89 @@ class GraphObsForRailEnv(ObservationBuilder):
             #
             # Hence, return this graph as the observation
             observations[a] = self.get(a)
+        """
+
+        #cell_seq = []
+        #for a in range(self.env.number_of_agents):
+        #    cell_seq.append(self.cells_sequence[a])
+
+        # make a copy of base_graph for reusability
+        # ************************************
+        # copy construction for the object
+        observations = copy.deepcopy(self.base_graph)
+        # ************************************
+
+        # for every agent
+        #   get its planned trajectory
+        #       find which edge is represented by the trajectory
+        #       Also if a half edge if represented then consider it till the end of that edge
+        #       (right before the end of section)
+        #   now enter for the edge
+        #       [train_ID, direction [start_cell, end_cell], time stamp [start, end]]
+        #           (EWNS might not work hence direction from source to dest)
+        # Return this as observation
+        import itertools
+        for a in range(self.env.number_of_agents):
+            traj = copy.deepcopy(self.cells_sequence[a][:-2])
+
+
+            start_timestamp = 0
+            while len(traj) > 1:
+                print(traj)
+                for edge in observations.edge_dict:
+                    print(edge)
+                    if traj[0] in edge[2] and traj[1] in edge[2]:
+                        #pos = np.where(traj[0] == edge[2])
+                        #pos = list(itertools.takewhile(lambda x: x[0] == traj[0][0] and x[1] == traj[0][1], edge[2]))
+                        pos = [i for i, tupl in enumerate(edge[2]) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
+
+                        # found but now decide if the edge coordinates match on left or right
+                        if 0 < pos < len(edge[2])-1:
+                            if traj[1] == edge[2][pos-1]:
+                                end_pos = 0
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][-1]
+                            elif traj[1] == edge[2][pos+1]:
+                                end_pos = len(edge[2])-1
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][0]
+                        elif 0 == pos:
+                            if traj[1] == edge[2][pos+1]:
+                                end_pos = len(edge[2])-1
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][0]
+                            else:
+                                end_pos = 0
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][-1]
+                        elif pos == len(edge[2])-1:
+                            if traj[1] == edge[2][pos-1]:
+                                end_pos = 0
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][-1]
+                            else:
+                                end_pos = len(edge[2])-1
+                                end_id = edge[2][end_pos]
+                                start_id = edge[2][0]
+
+                        # so a section is found that has part of desired trajectory
+                        # we have the agent ID
+                        print(a)
+
+                        # we have the direction,
+                        print(start_id, end_id)
+                        # we can find the relevant order for start and end for direction
+                        # we can also find the number of time steps (number of cells * 1/speed)
+
+                        end_timestamp = int(abs(pos - end_pos) * 1/self.env.agents[a].speed_data['speed'])
+                        print(start_timestamp, end_timestamp)
+
+                        traj = traj[abs(pos - end_pos):]
+
+                        edge[3].append([a,[start_id, end_id],[start_timestamp,end_timestamp]])
+                        print("Here \n \n")
+
+                        break
 
         return observations
 
@@ -921,19 +1005,25 @@ class GraphObsForRailEnv(ObservationBuilder):
                     if item[1] == 1:
                         print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
                         self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
-                        print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
-                        self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+                        #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                        #self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
                         added_vertex.append(item[0])
 
                     elif item[1] > 2:
                         print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
                         self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
-                        print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
-                        self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
-
+                        #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                        #self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
                         added_vertex.append(item[0])
                         pending_to_explore.append(item[0])
 
+                if item[1] == 1:
+                    print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+
+                elif item[1] > 2:
+                    print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
 
 
         return "built base graph"

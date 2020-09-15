@@ -33,10 +33,11 @@ class Global_Graph:
     def add_edge(self, frm, to, traj):
         # an edge can be added as follows
         #   both the vertices must exist
-        print("adding edge between ", self.num_edges, frm, to)
+        if [frm, to, traj, []] not in self.edge_dict and [to, frm, traj[::-1], []] not in self.edge_dict:
+            print("adding edge between ", self.num_edges, frm, to)
 
-        self.edge_dict.append([frm, to, traj, []])
-        self.num_edges += 1
+            self.edge_dict.append([frm, to, traj, []])
+            self.num_edges += 1
 
 
 
