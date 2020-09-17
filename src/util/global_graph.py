@@ -1,11 +1,71 @@
 
 """ ###################### EDGE ####################"""
+import numpy as np
 
 class g_edge:
-    def __init__(self, node1, node2):
-        self.start = node1
-        self.end = node2
-        self.cost_triples = []
+    def __init__(self, node1, node2, traj):
+        self.A = node1
+        self.B = node2
+        self.Cells = traj
+        self.Trains = []
+        self.TrainsDir = []  # 0 = A->B, 1 = B->A
+        self.TrainsTime = []
+        self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
+        self.CostCollisionLockTotal = 0
+        self.CostTransitionTimeTotal = 0
+        self.CostTotal = 0
+        #self.Triples = []
+
+    def setCosts(self):
+
+        self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
+        self.CostCollisionLockTotal = 0
+        self.CostTransitionTimeTotal = 0
+        self.CostTotal = 0
+
+        if len(self.Trains) > 1:
+
+
+            for t_num, t_id in enumerate(self.Trains):
+                for c_t_num, c_t_id in enumerate(self.Trains):
+                    # if the train is not compared with itself and
+                    # they have opposing direction
+                    if t_id != c_t_id and self.TrainsDir[t_num] != self.TrainsDir[c_t_num]:
+                        # check the amount of time overlap
+
+                        # find the max time for first Train
+                        if self.TrainsTime[t_num][1] > self.TrainsTime[c_t_num][1]:
+                            tmp = np.zeros((self.TrainsTime[t_num][1]+1))
+                        else:
+                            tmp = np.zeros((self.TrainsTime[c_t_num][1] + 1))
+
+                        for i in range(self.TrainsTime[t_num][0], self.TrainsTime[t_num][1]+1):
+                            tmp[i] += 1
+
+                        for i in range(self.TrainsTime[c_t_num][0], self.TrainsTime[c_t_num][1]+1):
+                            tmp[i] += 1
+
+                        if np.max(tmp) > 1:
+                            self.CollisionLockMatrix.append([t_num, c_t_num])
+
+                            #self.CollisionLockMatrix.append([c_t_num, t_num])
+
+                        # find the max time for second Train
+
+
+                        #print("Check time overlap")
+            # surely trains are on the same section
+            # check if they are in opposite direction
+            # if yes check if they have overlap of time
+
+            self.CostCollisionLockTotal = (100 * len(self.CollisionLockMatrix))/2
+
+            for item in self.TrainsTime:
+                self.CostTransitionTimeTotal += abs(item[1]-item[0])
+
+            self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
+
+
 
 class g_vertex:
     def __init__(self, node):
@@ -17,13 +77,19 @@ class g_vertex:
 class Global_Graph:
     def __init__(self):
         self.vert_dict = {}
+
+        # Below are redundant of each other
+        # this has only a list of string values for edges
         self.edge_dict = []
+        # this has edge objects created and stored
+        self.edge_ids = []
+
         self.num_vertices = 0
         self.num_edges = 0
 
     def add_vertex(self, node):
         if node not in self.vert_dict.keys():
-            print("adding vertex ", self.num_vertices, node)
+            #print("adding vertex ", self.num_vertices, node)
             self.num_vertices = self.num_vertices + 1
             new_vertex = g_vertex(node)
             self.vert_dict[node] = new_vertex
@@ -34,16 +100,23 @@ class Global_Graph:
         # an edge can be added as follows
         #   both the vertices must exist
         if [frm, to, traj, []] not in self.edge_dict and [to, frm, traj[::-1], []] not in self.edge_dict:
-            print("adding edge between ", self.num_edges, frm, to)
+            #print("adding edge between ", self.num_edges, frm, to)
 
             self.edge_dict.append([frm, to, traj, []])
             self.num_edges += 1
 
+        found = False
+        for item in self.edge_ids:
+            if (item.A == frm and item.B == to and item.Cells == traj) \
+                    or (item.A == to and item.B == frm and item.Cells == traj[::-1]):
+                found = True
 
-
+        if not found:
+            temp = g_edge(frm, to, traj)
+            self.edge_ids.append(temp)
 
 if __name__ == "__main__":
-    # create a graphof 4 nodes
+    # create a graph of 4 nodes
     #
     # if a node is added - only node list is updated
     # call graph insert method
@@ -60,11 +133,11 @@ if __name__ == "__main__":
     for edge in g.vert_dict['a'].edges:
         if edge.end == 'c':
             edge.cost_triples.append([1,2,3])
-            print("found")
+            #print("found")
     #edge_temp = g.edge_dict['ab']
     #edge_temp.cost_triples.append([1,2,3])
     #g.add_vertex('b')
     #g.add_vertex('c')
     #g.add_vertex('d')
     #g.add_vertex('e')
-    print("done")
+    #print("done")

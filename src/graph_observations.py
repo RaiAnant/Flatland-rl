@@ -179,61 +179,83 @@ class GraphObsForRailEnv(ObservationBuilder):
 
             start_timestamp = 0
             while len(traj) > 1:
-                print(traj)
-                for edge in observations.edge_dict:
-                    print(edge)
-                    if traj[0] in edge[2] and traj[1] in edge[2]:
+                #print(traj)
+                for edge in observations.edge_ids:
+                    #print(edge.Cells)
+                    if traj[0] in edge.Cells and traj[1] in edge.Cells:
                         #pos = np.where(traj[0] == edge[2])
                         #pos = list(itertools.takewhile(lambda x: x[0] == traj[0][0] and x[1] == traj[0][1], edge[2]))
-                        pos = [i for i, tupl in enumerate(edge[2]) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
+                        pos = [i for i, tupl in enumerate(edge.Cells) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
 
                         # found but now decide if the edge coordinates match on left or right
-                        if 0 < pos < len(edge[2])-1:
-                            if traj[1] == edge[2][pos-1]:
+                        if 0 < pos < len(edge.Cells)-1:
+                            if traj[1] == edge.Cells[pos-1]:
                                 end_pos = 0
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][-1]
-                            elif traj[1] == edge[2][pos+1]:
-                                end_pos = len(edge[2])-1
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][0]
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[-1]
+                            elif traj[1] == edge.Cells[pos+1]:
+                                end_pos = len(edge.Cells)-1
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[0]
                         elif 0 == pos:
-                            if traj[1] == edge[2][pos+1]:
-                                end_pos = len(edge[2])-1
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][0]
+                            if traj[1] == edge.Cells[pos+1]:
+                                end_pos = len(edge.Cells)-1
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[0]
                             else:
                                 end_pos = 0
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][-1]
-                        elif pos == len(edge[2])-1:
-                            if traj[1] == edge[2][pos-1]:
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[-1]
+                        elif pos == len(edge.Cells)-1:
+                            if traj[1] == edge.Cells[pos-1]:
                                 end_pos = 0
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][-1]
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[-1]
                             else:
-                                end_pos = len(edge[2])-1
-                                end_id = edge[2][end_pos]
-                                start_id = edge[2][0]
+                                end_pos = len(edge.Cells)-1
+                                end_id = edge.Cells[end_pos]
+                                start_id = edge.Cells[0]
 
                         # so a section is found that has part of desired trajectory
                         # we have the agent ID
-                        print(a)
+                        #print(a)
 
                         # we have the direction,
-                        print(start_id, end_id)
+                        #print(start_id, end_id)
                         # we can find the relevant order for start and end for direction
                         # we can also find the number of time steps (number of cells * 1/speed)
 
                         end_timestamp = int(abs(pos - end_pos) * 1/self.env.agents[a].speed_data['speed'])
-                        print(start_timestamp, end_timestamp)
+                        #print(start_timestamp, end_timestamp)
 
                         traj = traj[abs(pos - end_pos):]
 
-                        edge[3].append([a,[start_id, end_id],[start_timestamp,end_timestamp]])
-                        print("Here \n \n")
 
+                        edge.Trains.append(a)
+                        edge.TrainsTime.append(sorted([start_timestamp,end_timestamp]))
+                        if (str(start_id[0])+","+str(start_id[1]) == edge.A or str(end_id[0])+","+str(end_id[1]) == edge.B):
+                            edge.TrainsDir.append(0)
+                        elif (str(start_id[0])+","+str(start_id[1]) == edge.B or str(end_id[0])+","+str(end_id[1]) == edge.A):
+                            edge.TrainsDir.append(1)
+
+                        #edge[3].append([a,[start_id, end_id],[start_timestamp,end_timestamp]])
+                        #edge.Triples.append([a,[start_id, end_id],[start_timestamp,end_timestamp]])
+                        #print("Here \n \n")
+
+                        start_timestamp = end_timestamp
+                        #print("cost", edge.CostCollisionLockTotal)
                         break
+
+        # Now Build the the collision lock matrix
+        for edge in observations.edge_ids:
+            edge.setCosts()
+
+        cost = 0
+        for edge in observations.edge_ids:
+            cost += edge.CostTotal
+
+
+        print("Total cost of the Graph", cost)
 
         return observations
 
@@ -1003,14 +1025,14 @@ class GraphObsForRailEnv(ObservationBuilder):
             for item in next_pos:
                 if item[0] not in added_vertex:
                     if item[1] == 1:
-                        print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
+                        #print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
                         self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
                         #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
                         #self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
                         added_vertex.append(item[0])
 
                     elif item[1] > 2:
-                        print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
+                        #print("adding vertex ", str(item[0][0])+","+str(item[0][1]))
                         self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
                         #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
                         #self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
@@ -1018,11 +1040,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                         pending_to_explore.append(item[0])
 
                 if item[1] == 1:
-                    print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                    #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
                     self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
 
                 elif item[1] > 2:
-                    print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
+                    #print("adding edge between ", str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]))
                     self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
 
 
