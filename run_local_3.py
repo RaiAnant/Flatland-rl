@@ -14,6 +14,8 @@ from flatland.core.grid.grid4_utils import get_new_position
 import r2_solver
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.observations import TreeObsForRailEnv
+import copy
+
 
 from src.graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
@@ -122,7 +124,7 @@ def solve(env, width, height, naive):
         #            selected_agent=None,  # indicate which agent is "selected" in the editor):
         #            return_image=False):  # indicate if image is returned for use in monitor:
         time.sleep(1.0)
-        obs = next_obs.copy()
+        obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:
             break
 

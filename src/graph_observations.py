@@ -175,6 +175,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         import itertools
         for a in range(self.env.number_of_agents):
             traj = copy.deepcopy(self.cells_sequence[a][:-2])
+            traj.insert(0,self.env.agents[a].position if self.env.agents[a].position is not None else self.env.agents[a].initial_position )
 
 
             start_timestamp = 0
@@ -225,10 +226,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                         # we can find the relevant order for start and end for direction
                         # we can also find the number of time steps (number of cells * 1/speed)
 
-                        end_timestamp = int(abs(pos - end_pos) * 1/self.env.agents[a].speed_data['speed'])
+                        end_timestamp = start_timestamp + int((abs(pos - end_pos)) * 1/self.env.agents[a].speed_data['speed'])
                         #print(start_timestamp, end_timestamp)
 
-                        traj = traj[abs(pos - end_pos):]
+                        traj = traj[(abs(pos - end_pos)):]
 
 
                         edge.Trains.append(a)
@@ -246,7 +247,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                         #print("cost", edge.CostCollisionLockTotal)
                         break
 
+
+        observations.setCosts()
+
         # Now Build the the collision lock matrix
+        """
         for edge in observations.edge_ids:
             edge.setCosts()
 
@@ -256,6 +261,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
 
         print("Total cost of the Graph", cost)
+        """
 
         return observations
 

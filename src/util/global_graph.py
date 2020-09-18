@@ -12,9 +12,13 @@ class g_edge:
         self.TrainsTime = []
         self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
         self.CostCollisionLockTotal = 0
+        self.CostPerTrain = []
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
         #self.Triples = []
+
+    def __str__(self):
+        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)
 
     def setCosts(self):
 
@@ -23,47 +27,63 @@ class g_edge:
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
 
-        if len(self.Trains) > 1:
+        #if len(self.Trains) > 1:
+
+        self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
+        for t_num, t_id in enumerate(self.Trains):
+            for c_t_num, c_t_id in enumerate(self.Trains):
+                # if the train is not compared with itself and
+                # they have opposing direction
+                if t_id != c_t_id and self.TrainsDir[t_num] != self.TrainsDir[c_t_num]:
+                    # check the amount of time overlap
+
+                    # find the max time for first Train
+                    if self.TrainsTime[t_num][1] > self.TrainsTime[c_t_num][1]:
+                        tmp = np.zeros((self.TrainsTime[t_num][1]+1))
+                    else:
+                        tmp = np.zeros((self.TrainsTime[c_t_num][1] + 1))
+
+                    for i in range(self.TrainsTime[t_num][0], self.TrainsTime[t_num][1]+1):
+                        tmp[i] += 1
+
+                    for i in range(self.TrainsTime[c_t_num][0], self.TrainsTime[c_t_num][1]+1):
+                        tmp[i] += 1
+
+                    if np.max(tmp) > 1:
+                        self.CollisionLockMatrix[t_num][c_t_num] = 1
+
+                        #self.CollisionLockMatrix.append([c_t_num, t_num])
+
+                    # find the max time for second Train
 
 
-            for t_num, t_id in enumerate(self.Trains):
-                for c_t_num, c_t_id in enumerate(self.Trains):
-                    # if the train is not compared with itself and
-                    # they have opposing direction
-                    if t_id != c_t_id and self.TrainsDir[t_num] != self.TrainsDir[c_t_num]:
-                        # check the amount of time overlap
+                    #print("Check time overlap")
+        # surely trains are on the same section
+        # check if they are in opposite direction
+        # if yes check if they have overlap of time
 
-                        # find the max time for first Train
-                        if self.TrainsTime[t_num][1] > self.TrainsTime[c_t_num][1]:
-                            tmp = np.zeros((self.TrainsTime[t_num][1]+1))
-                        else:
-                            tmp = np.zeros((self.TrainsTime[c_t_num][1] + 1))
+        #self.CostCollisionLockTotal = (100 * np.count_nonzero(self.CollisionLockMatrix)/2)
 
-                        for i in range(self.TrainsTime[t_num][0], self.TrainsTime[t_num][1]+1):
-                            tmp[i] += 1
+        for i, item in enumerate(self.TrainsTime):
 
-                        for i in range(self.TrainsTime[c_t_num][0], self.TrainsTime[c_t_num][1]+1):
-                            tmp[i] += 1
+            self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
 
-                        if np.max(tmp) > 1:
-                            self.CollisionLockMatrix.append([t_num, c_t_num])
+            self.CostCollisionLockTotal = np.count_nonzero(self.CollisionLockMatrix[i])*100
 
-                            #self.CollisionLockMatrix.append([c_t_num, t_num])
+            self.CostTransitionTimeTotal += abs(item[1] - item[0])
 
-                        # find the max time for second Train
+        self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
 
+        print("here")
 
-                        #print("Check time overlap")
-            # surely trains are on the same section
-            # check if they are in opposite direction
-            # if yes check if they have overlap of time
+        #else:
+        #    for i, item in enumerate(self.TrainsTime):
 
-            self.CostCollisionLockTotal = (100 * len(self.CollisionLockMatrix))/2
+        #        self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
 
-            for item in self.TrainsTime:
-                self.CostTransitionTimeTotal += abs(item[1]-item[0])
+        #        self.CostTransitionTimeTotal += abs(item[1] - item[0])
 
-            self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
+        #    self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
 
 
 
@@ -72,6 +92,9 @@ class g_vertex:
         self.id = node
         self.edges = []
         self.transitions = []
+
+    def __str__(self):
+        return ' ID: ' + str(self.id)
 
 
 class Global_Graph:
@@ -86,6 +109,18 @@ class Global_Graph:
 
         self.num_vertices = 0
         self.num_edges = 0
+        self.CostTotalEnv = 0
+
+    def setCosts(self):
+        for edge in self.edge_ids:
+            edge.setCosts()
+
+        cost = 0
+        for edge in self.edge_ids:
+            cost += edge.CostTotal
+
+        self.CostTotalEnv = cost
+
 
     def add_vertex(self, node):
         if node not in self.vert_dict.keys():
@@ -95,6 +130,8 @@ class Global_Graph:
             self.vert_dict[node] = new_vertex
             return new_vertex
         return self.vert_dict[node]
+
+
 
     def add_edge(self, frm, to, traj):
         # an edge can be added as follows
