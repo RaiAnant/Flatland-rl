@@ -66,15 +66,20 @@ class g_edge:
 
         for i, item in enumerate(self.TrainsTime):
 
-            self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
+            if item[0] != 0:
+                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
+                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 50
 
-            self.CostCollisionLockTotal = np.count_nonzero(self.CollisionLockMatrix[i])*100
+            else:
+                self.CostPerTrain.append(abs(item[1] - item[0]))
+
+            #self.CostCollisionLockTotal = np.count_nonzero(self.CollisionLockMatrix[i])*100
 
             self.CostTransitionTimeTotal += abs(item[1] - item[0])
 
         self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
 
-        print("here")
+        #print("here")
 
         #else:
         #    for i, item in enumerate(self.TrainsTime):

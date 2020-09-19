@@ -111,7 +111,7 @@ def solve(env, width, height, naive):
         print("Rewards: {}, [done={}]".format(all_rewards, done))
         img = env_renderer.render_env(show=True, show_inactive_agents=False, show_predictions=True, show_observations=True,
                                 frames=True, return_image= True)
-        cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
+        #cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
         # render_env(self,
         #            show=False,  # whether to call matplotlib show() or equivalent after completion
         #            show_agents=True,  # whether to include agents
@@ -123,7 +123,7 @@ def solve(env, width, height, naive):
         #            step=None,  # int step number to show in image
         #            selected_agent=None,  # indicate which agent is "selected" in the editor):
         #            return_image=False):  # indicate if image is returned for use in monitor:
-        time.sleep(1.0)
+        #time.sleep(1.0)
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:
             break
