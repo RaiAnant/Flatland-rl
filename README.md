@@ -16,13 +16,23 @@ The overall cost on an edge if greater than 100 mean a collision.
 The attributes of the edge are:
 
 A: Start (One end of edge)
+
 B: End (Other end of edge)
+
 Cells: Predicted cell sequence upto max prediction depth.
+
 CollisionLocKMatrix: a matrix of # of trains X ' of trains with 1 to indicate a collision and 0 otherwise.
+
 CostCollisionLockTotal: 100 * # of collision for the train on that edge.
+
 CostPerTrain: per train transition time added with 100 * # of collision for the train on that edge.
+
 CostTotal: sum of CostCollisionLockTotal and CostTransitionTimeTotal.
+
 CostTransitionTimeTotal: The total time spent by all the trains on an edge.
+
 Trains: The ID's of the trains on the edge at any time during the predicted future.
+
 TrainsDir: The direction for each train (0 for A->B; 1 for B->A).
+
 TrainsTime: The time when a given train enters and exits an edge during the predicted future.
