@@ -78,66 +78,17 @@ def naive_solver(env, obs):
 
     return actions
 
-
-def solve(env, width, height, naive):
-    env_renderer = RenderTool(env)
-    solver = r2_solver.Solver(1)
-    obs, _ = env.reset()
-    shortestPred = ShortestPathPredictorForRailEnv(max_depth=40)
-    # shortestPred.get()
-    shortestPred.env = env
-    shortestPred.get()
-    for step in range(8 * (width + height + 20)):
-
-        # print(obs)
-        # print(obs.shape)
-
-        if naive:
-            _action = naive_solver(env, obs)
-        else:
-            _action = solver.GetMoves(env.agents, obs)
-
-        for k in _action.keys():
-            if env.agents[k].position is None:
-                continue
-
-            pos = (env.agents[k].position[0], env.agents[k].position[1], env.agents[k].direction)
-            if _action[k] != 0 and pos in env.dev_pred_dict[k]:
-                env.dev_pred_dict[k].remove(pos)
-
-        next_obs, all_rewards, done, _ = env.step(_action)
-        # print(next_obs[0]==next_obs[1])
-
-        print("Rewards: {}, [done={}]".format(all_rewards, done))
-        img = env_renderer.render_env(show=True, show_inactive_agents=False, show_predictions=True, show_observations=True,
-                                frames=True, return_image= True)
-        #cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
-        # render_env(self,
-        #            show=False,  # whether to call matplotlib show() or equivalent after completion
-        #            show_agents=True,  # whether to include agents
-        #            show_inactive_agents=False,  # whether to show agents before they start
-        #            show_observations=True,  # whether to include observations
-        #            show_predictions=False,  # whether to include predictions
-        #            frames=False,  # frame counter to show (intended since invocation)
-        #            episode=None,  # int episode number to show
-        #            step=None,  # int step number to show in image
-        #            selected_agent=None,  # indicate which agent is "selected" in the editor):
-        #            return_image=False):  # indicate if image is returned for use in monitor:
-        #time.sleep(1.0)
-        obs = copy.deepcopy(next_obs)
-        if obs is None or done['__all__']:
-            break
-
-
-def approach2(naive=False):
+if __name__ == "__main__":
     NUMBER_OF_AGENTS = 9
     width = 30
     height = 30
 
-    rail_generator = sparse_rail_generator(max_num_cities=5, grid_mode=False, max_rails_between_cities=2,
-                                           max_rails_in_city=3, seed=1)
+    rail_generator = sparse_rail_generator(max_num_cities=5,
+                                           grid_mode=False,
+                                           max_rails_between_cities=2,
+                                           max_rails_in_city=3,
+                                           seed=1)
 
-    #observation_builder = TreeObsForRailEnv(max_depth=10)
     observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=10),
                                              bfs_depth=200)
 
@@ -149,43 +100,39 @@ def approach2(naive=False):
         number_of_agents=NUMBER_OF_AGENTS
     )
 
-    solve(env, width, height, naive)
+    env_renderer = RenderTool(env)
+    obs, _ = env.reset()
 
+    status = observation_builder.optimize(obs)
+    print("Success") if status else print("fail")
 
-approach2(True)
-# def approach1(tid = 9):
-#     seed, width, height, nr_trains, nr_cities, max_rails_between_cities, max_rails_in_cities, malfunction_rate, malfunction_min_duration, malfunction_max_duration = GetTestParams(tid)
-#     rail_generator = sparse_rail_generator(max_num_cities=nr_cities,
-#                                            seed=seed,
-#                                            grid_mode=False,
-#                                            max_rails_between_cities=max_rails_between_cities,
-#                                            max_rails_in_city=max_rails_in_cities,
-#                                            )
-#     schedule_generator = sparse_schedule_generator(DEFAULT_SPEED_RATIO_MAP)
-#
-#     stochastic_data = {'malfunction_rate': malfunction_rate,
-#                        'min_duration': malfunction_min_duration,
-#                        'max_duration': malfunction_max_duration
-#                        }
-#     observation_builder = GlobalObsForRailEnv()
-#     env = RailEnv(width=width,
-#                   height=height,
-#                   rail_generator=rail_generator,
-#                   schedule_generator=schedule_generator,
-#                   number_of_agents=nr_trains,
-#                   malfunction_generator_and_process_data=malfunction_from_params(stoch_data(malfunction_rate, malfunction_min_duration, malfunction_max_duration)),
-#                   obs_builder_object=observation_builder,
-#                   remove_agents_at_target=True
-#                   )
-#
-#     solve(env, width, height)
+    for step in range(8 * (width + height + 20)):
 
+        _action = naive_solver(env, obs)
 
-# def my_controller():
-#     """
-#     You are supposed to write this controller
-#     """
-#     _action = {}
-#     for _idx in range(NUMBER_OF_AGENTS):
-#         _action[_idx] = np.random.randint(0, 5)
-#     return _action
+        for k in _action.keys():
+            if env.agents[k].position is None:
+                continue
+
+            pos = (env.agents[k].position[0], env.agents[k].position[1], env.agents[k].direction)
+            if _action[k] != 0 and pos in env.dev_pred_dict[k]:
+                env.dev_pred_dict[k].remove(pos)
+
+        next_obs, all_rewards, done, _ = env.step(_action)
+
+        print("Rewards: {}, [done={}]".format(all_rewards, done))
+
+        img = env_renderer.render_env(show=True,
+                                      show_inactive_agents=False,
+                                      show_predictions=True,
+                                      show_observations=True,
+                                      frames=True,
+                                      return_image= True)
+
+        cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
+
+        time.sleep(1.0)
+
+        obs = copy.deepcopy(next_obs)
+        if obs is None or done['__all__']:
+            break

@@ -15,7 +15,6 @@ class g_edge:
         self.CostPerTrain = []
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
-        #self.Triples = []
 
     def __str__(self):
         return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)
