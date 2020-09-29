@@ -17,7 +17,7 @@ class g_edge:
         self.CostTotal = 0
 
     def __str__(self):
-        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)
+        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)# + ' Cells: ' + str(self.Cells)
 
     def setCosts(self):
 
