@@ -325,7 +325,8 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.prediction_dict = self.predictor.get()
         # Useful to check if occupancy is correctly computed
         self.cells_sequence = self.predictor.compute_cells_sequence(self.prediction_dict)
-
+        self.max_prediction_depth = self.predictor.max_depth
+        """
         if self.prediction_dict:
             self.max_prediction_depth = self.predictor.max_depth
             for t in range(self.max_prediction_depth):
@@ -338,13 +339,14 @@ class GraphObsForRailEnv(ObservationBuilder):
                     dir_list.append(self.prediction_dict[a][t][3])
                 self.predicted_pos_coord.update({t: pos_list})
                 self.predicted_pos.update({t: coordinate_to_position(self.env.width, pos_list)})
-                self.predicted_dir.update({t: dir_list})
+                #self.predicted_dir.update({t: dir_list})
 
-            for a in range(len(self.env.agents)):
-                pos_list = []
-                for ts in range(self.max_prediction_depth):
-                    pos_list.append(self.predicted_pos[ts][a])  # Use int positions
-                self.predicted_pos_list.update({a: pos_list})
+            #for a in range(len(self.env.agents)):
+            #    pos_list = []
+            #    for ts in range(self.max_prediction_depth):
+            #        pos_list.append(self.predicted_pos[ts][a])  # Use int positions
+            #    #self.predicted_pos_list.update({a: pos_list})
+        """
 
     def populate_graph(self, observations):
         # ************************************
@@ -364,62 +366,84 @@ class GraphObsForRailEnv(ObservationBuilder):
             # manipulate trajectory for the agent to be modified
             traj = copy.deepcopy(self.cells_sequence[a][:-2])
             traj.insert(0,self.env.agents[a].position if self.env.agents[a].position is not None else self.env.agents[a].initial_position )
+            #traj = [tuple((5,9)), tuple((5,8)), tuple((5,8)), tuple((5,8))]
 
 
             start_timestamp = 0
             while len(traj) > 1:
                 #print(traj)
+                start_timestamp_copy = copy.deepcopy(start_timestamp)
                 for edge in observations.edge_ids:
                     #print(edge.Cells)
                     if traj[0] in edge.Cells and traj[1] in edge.Cells:
-                        pos = [i for i, tupl in enumerate(edge.Cells) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
+                        edge_pos = [i for i, tupl in enumerate(edge.Cells) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
 
-                        # found but now decide if the edge coordinates match on left or right
-                        if 0 < pos < len(edge.Cells)-1:
-                            if traj[1] == edge.Cells[pos-1]:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                            elif traj[1] == edge.Cells[pos+1]:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
-                        elif 0 == pos:
-                            if traj[1] == edge.Cells[pos+1]:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
-                            else:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                        elif pos == len(edge.Cells)-1:
-                            if traj[1] == edge.Cells[pos-1]:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                            else:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
+                        # step_dir is the value is either 1 or -1 being the step in either direction of the edge
+                        if 0 < edge_pos < len(edge.Cells) - 1:
+                            if traj[1] == edge.Cells[edge_pos - 1]:
+                                step_dir = -1
+                            elif traj[1] == edge.Cells[edge_pos + 1]:
+                                step_dir = 1
+                        elif 0 == edge_pos:
+                            step_dir = 1
+                        elif edge_pos == len(edge.Cells) - 1:
+                            step_dir = -1
 
+                        edge_pos_end = 0
+                        edge_cells = edge.Cells[edge_pos:len(edge.Cells)] if step_dir == 1 else edge.Cells[0:edge_pos+1][::-1]
+
+                        traj_pos_end = 0
+                        touched = False
+                        while True:
+
+                            # If predicted trajectory is remaining
+                            #   check if next pos in the predicted trajectory is equal to the current cell of edge
+                            #
+                            #   if yes
+                            #       increment the traj_pos_end
+                            #   else
+                            #       if edge has cells remaining
+                            #           if next pos in the predicted trajectory is equal to the next cell of the edge
+                            #               increment traj_pos_end
+                            #               step edge_pos_end
+                            #           else
+                            #               break
+
+                            if len(traj) > traj_pos_end and len(edge_cells) > edge_pos_end:
+                                touched = True
+
+                                # if the current positions are equal then proceed in trajectory
+                                if traj[traj_pos_end] == edge_cells[edge_pos_end]:
+                                    traj_pos_end += 1
+                                elif edge_pos_end < len(edge_cells)-1:
+                                    if traj[traj_pos_end] == edge_cells[edge_pos_end+1]:
+                                        edge_pos_end += 1
+                                    else:
+                                        break
+                                else:
+                                    break
+                            else:
+                                break
+
+                        print("here")
                         # so a section is found that has part of desired trajectory
                         # we have the agent ID
                         # we have the direction,
                         # we can find the relevant order for start and end for direction
                         # we can also find the number of time steps (number of cells * 1/speed)
-                        end_timestamp = start_timestamp + int((abs(pos - end_pos)) * 1/self.env.agents[a].speed_data['speed'])
-                        traj = traj[(abs(pos - end_pos)):]
+                        if touched:
+                            traj_pos_end -= 1
+                            end_timestamp = start_timestamp + int((edge_pos_end) * 1 / self.env.agents[a].speed_data['speed'])
 
-                        edge.Trains.append(a)
-                        edge.TrainsTime.append(sorted([start_timestamp,end_timestamp]))
-                        if (str(start_id[0])+","+str(start_id[1]) == edge.A or str(end_id[0])+","+str(end_id[1]) == edge.B):
-                            edge.TrainsDir.append(0)
-                        elif (str(start_id[0])+","+str(start_id[1]) == edge.B or str(end_id[0])+","+str(end_id[1]) == edge.A):
-                            edge.TrainsDir.append(1)
+                            if start_timestamp != end_timestamp:
+                                edge.Trains.append(a)
+                                edge.TrainsTime.append(sorted([start_timestamp, end_timestamp]))
+                                edge.TrainsDir.append(0 if step_dir == 1 else 1)
+                                start_timestamp = end_timestamp
+                        else:
+                            break
 
-                        start_timestamp = end_timestamp
-                        break
+                traj = traj[traj_pos_end:]
 
         # Now Build the the collision lock matrix
         observations.setCosts()
@@ -439,7 +463,9 @@ class GraphObsForRailEnv(ObservationBuilder):
         # copy construction for the object
         observations = copy.deepcopy(self.base_graph)
 
-        return self.populate_graph(observations)
+        observations = self.populate_graph(observations)
+
+        return observations
 
     # TODO Optimize considering that I don't need obs for those agents who don't have to pick actions
     def get(self) -> {}:
@@ -466,6 +492,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
     def optimize(self, observations):
 
+        #comp_observations = copy.deepcopy(observations)
         check_again = True
         check_again_counter = 0
 
@@ -482,17 +509,17 @@ class GraphObsForRailEnv(ObservationBuilder):
                     t_id = edge.Trains[id]
                     time = edge.TrainsTime[id][0]
 
-                    self.cells_sequence[t_id][time:] = [tuple((0,0))] * (len(self.cells_sequence[t_id])-time)
+                    self.cells_sequence[t_id][time-1:] = [self.cells_sequence[t_id][time]] * (len(self.cells_sequence[t_id])-time)
+                    #self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
 
-                    self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
-
-                    print("here")
 
             # make a copy of base_graph for reusability
             # ************************************
             # copy construction for the object
             observations = copy.deepcopy(self.base_graph)
             observations = self.populate_graph(observations)
+
+            print("here")
 
             # set check again to False
             # else: optimize
