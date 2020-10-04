@@ -143,13 +143,17 @@ class ShortestPathPredictorForRailEnv(PredictionBuilder):
     def compute_cells_sequence(self, prediction_dict):
 
         cells_sequence = defaultdict(list)
+        time_at_cell = defaultdict(list)
         agents = self.env.agents
         for a in agents:
+            step_size = 1/a.speed_data['speed']
             for step in prediction_dict[a.handle]:
-                cell_pos = (step[1], step[2])  # Takes (yi, xi)
-                cells_sequence[a.handle].append(cell_pos)
+                if step[4] != RailEnvActions.STOP_MOVING:
+                    cell_pos = (step[1], step[2])  # Takes (yi, xi)
+                    cells_sequence[a.handle].append(cell_pos)
+                    time_at_cell[a.handle].append(step_size)
 
-        return cells_sequence
+        return cells_sequence, time_at_cell
 
     def get_prediction_depth(self):
         return self.max_depth
