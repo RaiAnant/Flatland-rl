@@ -530,7 +530,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         check_again = True
         check_again_counter = 0
 
-        while check_again and check_again_counter < 10:
+        while check_again and check_again_counter < 1000:
             # check if the cost is within limits
             check_again = False
             check_again_counter += 1
@@ -567,14 +567,16 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     self.time_at_cell[t_id][(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]] = end_time + 1 - time + 1
 
-                    #self.time_at_cell[t_id][time-1] = end_time + 1 - time + 1
+                    #mul = (len(self.time_at_cell[t_id])-(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0])
+                    #value = [1.0] * mul
+                    #self.time_at_cell[t_id][int((np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]):] = value
 
 
             # make a copy of base_graph for reusability
             observations = copy.deepcopy(self.base_graph)
             observations = self.populate_graph(observations)
-            ob_list.append(observations)
+            #ob_list.append(observations)
             local_copy = copy.deepcopy(self.time_at_cell)
-            time_update_list.append(local_copy)
+            #time_update_list.append(local_copy)
 
         return ob_list
