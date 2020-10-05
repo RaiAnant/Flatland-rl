@@ -58,6 +58,7 @@ def naive_solver(env, obs):
             possible_transitions = env.rail.get_transitions(*agent.position, agent.direction)
         except:
             possible_transitions = env.rail.get_transitions(*agent.initial_position, agent.direction)
+
         num_transitions = np.count_nonzero(possible_transitions)
 
         # Start from the current orientation, and see which transitions are available;
