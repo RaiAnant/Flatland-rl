@@ -366,10 +366,25 @@ class GraphObsForRailEnv(ObservationBuilder):
                         pending_to_explore.append(item[0])
 
                 if item[1] == 1:
-                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+
+                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+
+                    source_node.edges.append(added_edge)
+                    dest_node.edges.append(added_edge)
+
 
                 elif item[1] > 2:
-                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+
+
+                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+
+                    source_node.edges.append(added_edge)
+                    dest_node.edges.append(added_edge)
+
 
         return "built base graph"
 
