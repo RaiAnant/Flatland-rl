@@ -80,9 +80,10 @@ def naive_solver(env, obs):
     return actions
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 9
+    NUMBER_OF_AGENTS = 17
     width = 30
     height = 30
+    max_prediction_depth = 30
 
     rail_generator = sparse_rail_generator(max_num_cities=5,
                                            grid_mode=False,
@@ -90,7 +91,7 @@ if __name__ == "__main__":
                                            max_rails_in_city=3,
                                            seed=1)
 
-    observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=10),
+    observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=max_prediction_depth),
                                              bfs_depth=200)
 
     env = RailEnv(

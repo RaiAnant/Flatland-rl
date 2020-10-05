@@ -3,9 +3,11 @@
 import numpy as np
 
 class g_edge:
-    def __init__(self, node1, node2, traj):
+    def __init__(self, node1, node2, node1_id, node2_id, traj):
         self.A = node1
         self.B = node2
+        self.A_node = node1_id
+        self.B_node = node2_id
         self.Cells = traj
         self.Trains = []
         self.TrainsDir = []  # 0 = A->B, 1 = B->A
@@ -17,7 +19,7 @@ class g_edge:
         self.CostTotal = 0
 
     def __str__(self):
-        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)
+        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)# + ' Cells: ' + str(self.Cells)
 
     def setCosts(self):
 
@@ -107,7 +109,7 @@ class Global_Graph:
 
         # Below are redundant of each other
         # this has only a list of string values for edges
-        self.edge_dict = []
+        #self.edge_dict = []
         # this has edge objects created and stored
         self.edge_ids = []
 
@@ -137,14 +139,13 @@ class Global_Graph:
 
 
 
-    def add_edge(self, frm, to, traj):
+    def add_edge(self, frm, to, frm_id, to_id, traj):
         # an edge can be added as follows
         #   both the vertices must exist
-        if [frm, to, traj, []] not in self.edge_dict and [to, frm, traj[::-1], []] not in self.edge_dict:
-            #print("adding edge between ", self.num_edges, frm, to)
-
-            self.edge_dict.append([frm, to, traj, []])
-            self.num_edges += 1
+        #if [frm, to, traj, []] not in self.edge_dict and [to, frm, traj[::-1], []] not in self.edge_dict:
+        #    #print("adding edge between ", self.num_edges, frm, to)#
+        #    self.edge_dict.append([frm, to, traj, []])
+        #    self.num_edges += 1
 
         found = False
         for item in self.edge_ids:
@@ -153,8 +154,9 @@ class Global_Graph:
                 found = True
 
         if not found:
-            temp = g_edge(frm, to, traj)
+            temp = g_edge(frm, to, frm_id, to_id, traj)
             self.edge_ids.append(temp)
+            return temp
 
 if __name__ == "__main__":
     # create a graph of 4 nodes

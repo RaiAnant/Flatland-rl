@@ -50,6 +50,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.predicted_dir = {}  # Dict ts : dir (float)
         self.num_active_agents = 0
         self.cells_sequence = None
+        self.time_at_cell = None
         self.forks_coords = None
         self.base_graph = None
 
@@ -62,27 +63,55 @@ class GraphObsForRailEnv(ObservationBuilder):
     def reset(self):
         """
         Inherited method used for pre computations.
+
+        :param:
         :return:
         """
-
         self.forks_coords = self._find_forks()
 
-    # ########################################################################################
-    @staticmethod
-    def _reverse_dir(direction):
+    # TODO Optimize considering that I don't need obs for those agents who don't have to pick actions
+    def get(self) -> {}:
         """
-        Invert direction (int) of one agent.
-        :param direction:
+        Returns obs for one agent, obs are a single array of concatenated values representing:
+        - occupancy of next prediction_depth cells,
+        - agent priority/speed,
+        - number of malfunctioning agents (encountered),
+        - number of agents that are ready to depart (encountered).
+        :param handle:
         :return:
         """
-        return int((direction + 2) % 4)
+
+        self.prepare_global_var()
+        # make a copy of base_graph for reusability
+        # ************************************
+        # copy construction for the object
+        observations = copy.deepcopy(self.base_graph)
+
+        return self.populate_graph(observations)
+
+    def get_many(self, handles) -> {}:
+        """
+        Compute observations for all agents in the env.
+        :param handles:
+        :return:
+        """
+
+        self.prepare_global_var()
+        # make a copy of base_graph for reusability
+        # ************************************
+        # copy construction for the object
+        observations = copy.deepcopy(self.base_graph)
+
+        observations = self.populate_graph(observations)
+
+        return observations
 
     def _find_forks(self):
         """
         A fork (in the map) is either a switch or a diamond crossing.
+
         :return:
         """
-        print("_find_forks()")
 
         forks = set() # Set of nodes as tuples/coordinates
         # Identify cells hat are nodes (have switches)
@@ -109,11 +138,183 @@ class GraphObsForRailEnv(ObservationBuilder):
                     forks.add((i, j))
 
         return forks
-    # ########################################################################################
-    # #################################### FPR GLOBAL GRAPH ##################################
 
+    def prepare_global_var(self) -> {}:
+        """
+
+        :return:
+        """
+
+        if self.base_graph == None:
+            print(self.build_global_graph())
+
+        """
+        self.num_active_agents = 0
+        for a in self.env.agents:
+            if a.status == RailAgentStatus.ACTIVE:
+                self.num_active_agents += 1
+        """
+
+        self.prediction_dict = self.predictor.get()
+        # Useful to check if occupancy is correctly computed
+        self.cells_sequence, self.time_at_cell = self.predictor.compute_cells_sequence(self.prediction_dict)
+
+        self.max_prediction_depth = self.predictor.max_depth
+        """
+        if self.prediction_dict:
+            self.max_prediction_depth = self.predictor.max_depth
+            for t in range(self.max_prediction_depth):
+                pos_list = []
+                dir_list = []
+                for a in range(self.env.number_of_agents):
+                    if self.prediction_dict[a] is None:
+                        continue
+                    pos_list.append(self.prediction_dict[a][t][1:3])
+                    dir_list.append(self.prediction_dict[a][t][3])
+                self.predicted_pos_coord.update({t: pos_list})
+                self.predicted_pos.update({t: coordinate_to_position(self.env.width, pos_list)})
+                #self.predicted_dir.update({t: dir_list})
+
+            #for a in range(len(self.env.agents)):
+            #    pos_list = []
+            #    for ts in range(self.max_prediction_depth):
+            #        pos_list.append(self.predicted_pos[ts][a])  # Use int positions
+            #    #self.predicted_pos_list.update({a: pos_list})
+        """
+
+    def populate_graph(self, observations):
+        """
+        Inherited method used for pre computations.
+
+        :return:
+        """
+        """
+        for every agent
+           get its planned trajectory
+               find which edge is represented by the trajectory
+               Also if a half edge if represented then consider it till the end of that edge
+               (right before the end of section)
+           now enter for the edge
+               [train_ID, direction [start_cell, end_cell], time stamp [start, end]]
+                   (EWNS might not work hence direction from source to dest)
+         Return this as observation
+        """
+        for a in range(self.env.number_of_agents):
+
+            # manipulate trajectory for the agent to be modified
+            traj = copy.deepcopy(self.cells_sequence[a][:-2])
+            traj.insert(0, self.env.agents[a].position if self.env.agents[a].position is not None else self.env.agents[
+                a].initial_position)
+
+            #initial_position = self.env.agents[a].initial_position
+
+            start_timestamp = 0
+            traj_pos_end_counter = 0
+
+            while len(traj) > 1:
+
+                for edge in observations.edge_ids:
+                    if traj[0] in edge.Cells \
+                            and traj[1] in edge.Cells:
+
+                        #traj.insert(0, initial_position)
+
+                        agent_pos_on_edge = [i for i, tupl in enumerate(edge.Cells)
+                                    if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
+
+                        # step_dir is the value is either 1 or -1 being the step in either direction of the edge
+                        if 0 < agent_pos_on_edge < len(edge.Cells) - 1:
+                            if traj[1] == edge.Cells[agent_pos_on_edge - 1]:
+                                step_dir = -1
+                            elif traj[1] == edge.Cells[agent_pos_on_edge + 1]:
+                                step_dir = 1
+                        elif 0 == agent_pos_on_edge:
+                            step_dir = 1
+                        elif agent_pos_on_edge == len(edge.Cells) - 1:
+                            step_dir = -1
+
+                        edge_cells = edge.Cells[agent_pos_on_edge:len(edge.Cells)] if step_dir == 1 else edge.Cells[0:agent_pos_on_edge+1][::-1]
+                        #edge_cells.insert(0,initial_position)
+
+                        traj_pos_end = 0
+
+                        touched = False
+                        while True:
+
+                            # If predicted trajectory is remaining
+                            #   check if next pos in the predicted trajectory is equal to the current cell of edge
+                            #
+                            #   if yes
+                            #       increment the traj_pos_end
+                            #   else
+                            #       if edge has cells remaining
+                            #           if next pos in the predicted trajectory is equal to the next cell of the edge
+                            #               increment traj_pos_end
+                            #               step edge_pos_end
+                            #           else
+                            #               break
+
+                            if len(traj) > traj_pos_end and len(edge_cells) > traj_pos_end:
+                                touched = True
+
+                                # if the current positions are equal then proceed in trajectory
+                                if traj[traj_pos_end] == edge_cells[traj_pos_end]:
+                                    traj_pos_end += 1
+                                    #edge_pos_end += 1
+                                else:
+                                    break
+                            else:
+                                break
+
+                        # so a section is found that has part of desired trajectory
+                        # we have the agent ID
+                        # we have the direction,
+                        # we can find the relevant order for start and end for direction
+                        # we can also find the number of time steps (number of cells * 1/speed)
+                        if touched:
+                            traj_pos_end -= 1
+                            end_timestamp = int(start_timestamp
+                                                + np.sum(self.time_at_cell[a][int(traj_pos_end_counter)
+                                                                              :int(traj_pos_end_counter)+traj_pos_end])
+                                                * 1 / self.env.agents[a].speed_data['speed'])
+
+                            if start_timestamp != end_timestamp:
+                                edge.Trains.append(a)
+                                edge.TrainsTime.append(sorted([start_timestamp, end_timestamp]))
+                                edge.TrainsDir.append(0 if step_dir == 1 else 1)
+                                #start_timestamp = int(start_timestamp
+                                #                    + np.sum(self.time_at_cell[a][int(traj_pos_end_counter)
+                                #                                                  :int(traj_pos_end_counter) + traj_pos_end-1])
+                                #                    * 1 / self.env.agents[a].speed_data['speed'])
+                                start_timestamp = end_timestamp
+
+                        traj_pos_end_counter += traj_pos_end
+                        break
+
+                initial_position = traj[traj_pos_end-1]
+                traj = traj[traj_pos_end:]
+
+        # Now Build the the collision lock matrix
+        observations.setCosts()
+
+        return observations
+
+    @staticmethod
+    def _reverse_dir(direction):
+        """
+        Invert direction (int) of one agent.
+
+        :param direction:
+        :return:
+        """
+        return int((direction + 2) % 4)
+
+    # For Global Graph
     def build_global_graph(self):
-        print("build_global_graph()")
+        """
+
+        :return:
+        """
 
         self.base_graph = Global_Graph()
 
@@ -165,16 +366,33 @@ class GraphObsForRailEnv(ObservationBuilder):
                         pending_to_explore.append(item[0])
 
                 if item[1] == 1:
-                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+
+                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+
+                    source_node.edges.append(added_edge)
+                    dest_node.edges.append(added_edge)
+
 
                 elif item[1] > 2:
-                    self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), item[2])
+                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+
+
+                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+
+                    source_node.edges.append(added_edge)
+                    dest_node.edges.append(added_edge)
+
 
         return "built base graph"
 
     def _step_extend(self, current, direction):
+        """
 
-        print("_step_extend()")
+        :return:
+        """
 
         traj = []
 
@@ -230,7 +448,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                 return [position, total_transitions], traj
 
     def _step(self, current):
-        print("_step()")
+        """
+
+        :return:
+        """
 
         init_position = current
         node_list = []
@@ -311,190 +532,66 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         return node_list
 
-    # ########################################################################################
-
-    def prepare_global_var(self) -> {}:
-
-        if self.base_graph == None:
-            print(self.build_global_graph())
-
-        self.num_active_agents = 0
-        for a in self.env.agents:
-            if a.status == RailAgentStatus.ACTIVE:
-                self.num_active_agents += 1
-        self.prediction_dict = self.predictor.get()
-        # Useful to check if occupancy is correctly computed
-        self.cells_sequence = self.predictor.compute_cells_sequence(self.prediction_dict)
-
-        if self.prediction_dict:
-            self.max_prediction_depth = self.predictor.max_depth
-            for t in range(self.max_prediction_depth):
-                pos_list = []
-                dir_list = []
-                for a in range(self.env.number_of_agents):
-                    if self.prediction_dict[a] is None:
-                        continue
-                    pos_list.append(self.prediction_dict[a][t][1:3])
-                    dir_list.append(self.prediction_dict[a][t][3])
-                self.predicted_pos_coord.update({t: pos_list})
-                self.predicted_pos.update({t: coordinate_to_position(self.env.width, pos_list)})
-                self.predicted_dir.update({t: dir_list})
-
-            for a in range(len(self.env.agents)):
-                pos_list = []
-                for ts in range(self.max_prediction_depth):
-                    pos_list.append(self.predicted_pos[ts][a])  # Use int positions
-                self.predicted_pos_list.update({a: pos_list})
-
-    def populate_graph(self, observations):
-        # ************************************
-
-        # for every agent
-        #   get its planned trajectory
-        #       find which edge is represented by the trajectory
-        #       Also if a half edge if represented then consider it till the end of that edge
-        #       (right before the end of section)
-        #   now enter for the edge
-        #       [train_ID, direction [start_cell, end_cell], time stamp [start, end]]
-        #           (EWNS might not work hence direction from source to dest)
-        # Return this as observation
-        import itertools
-        for a in range(self.env.number_of_agents):
-
-            # manipulate trajectory for the agent to be modified
-            traj = copy.deepcopy(self.cells_sequence[a][:-2])
-            traj.insert(0,self.env.agents[a].position if self.env.agents[a].position is not None else self.env.agents[a].initial_position )
-
-
-            start_timestamp = 0
-            while len(traj) > 1:
-                #print(traj)
-                for edge in observations.edge_ids:
-                    #print(edge.Cells)
-                    if traj[0] in edge.Cells and traj[1] in edge.Cells:
-                        pos = [i for i, tupl in enumerate(edge.Cells) if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
-
-                        # found but now decide if the edge coordinates match on left or right
-                        if 0 < pos < len(edge.Cells)-1:
-                            if traj[1] == edge.Cells[pos-1]:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                            elif traj[1] == edge.Cells[pos+1]:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
-                        elif 0 == pos:
-                            if traj[1] == edge.Cells[pos+1]:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
-                            else:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                        elif pos == len(edge.Cells)-1:
-                            if traj[1] == edge.Cells[pos-1]:
-                                end_pos = 0
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[-1]
-                            else:
-                                end_pos = len(edge.Cells)-1
-                                end_id = edge.Cells[end_pos]
-                                start_id = edge.Cells[0]
-
-                        # so a section is found that has part of desired trajectory
-                        # we have the agent ID
-                        # we have the direction,
-                        # we can find the relevant order for start and end for direction
-                        # we can also find the number of time steps (number of cells * 1/speed)
-                        end_timestamp = start_timestamp + int((abs(pos - end_pos)) * 1/self.env.agents[a].speed_data['speed'])
-                        traj = traj[(abs(pos - end_pos)):]
-
-                        edge.Trains.append(a)
-                        edge.TrainsTime.append(sorted([start_timestamp,end_timestamp]))
-                        if (str(start_id[0])+","+str(start_id[1]) == edge.A or str(end_id[0])+","+str(end_id[1]) == edge.B):
-                            edge.TrainsDir.append(0)
-                        elif (str(start_id[0])+","+str(start_id[1]) == edge.B or str(end_id[0])+","+str(end_id[1]) == edge.A):
-                            edge.TrainsDir.append(1)
-
-                        start_timestamp = end_timestamp
-                        break
-
-        # Now Build the the collision lock matrix
-        observations.setCosts()
-
-        return observations
-
-    def get_many(self, handles) -> {}:
-        """
-        Compute observations for all agents in the env.
-        :param handles:
-        :return:
-        """
-
-        self.prepare_global_var()
-        # make a copy of base_graph for reusability
-        # ************************************
-        # copy construction for the object
-        observations = copy.deepcopy(self.base_graph)
-
-        return self.populate_graph(observations)
-
-    # TODO Optimize considering that I don't need obs for those agents who don't have to pick actions
-    def get(self) -> {}:
-        """
-        Returns obs for one agent, obs are a single array of concatenated values representing:
-        - occupancy of next prediction_depth cells,
-        - agent priority/speed,
-        - number of malfunctioning agents (encountered),
-        - number of agents that are ready to depart (encountered).
-        :param handle:
-        :return:
-        """
-
-        self.prepare_global_var()
-        # make a copy of base_graph for reusability
-        # ************************************
-        # copy construction for the object
-        observations = copy.deepcopy(self.base_graph)
-
-        return self.populate_graph(observations)
-
-
-    # ########################################################################################
-
     def optimize(self, observations):
+        """
 
+        :return:
+        """
+
+        ob_list = []
+        time_update_list = []
+        ob_list.append(observations)
+        #comp_observations = copy.deepcopy(observations)
         check_again = True
         check_again_counter = 0
 
-        while check_again and check_again_counter < 10:
+        while check_again and check_again_counter < 1000:
             # check if the cost is within limits
             check_again = False
             check_again_counter += 1
             for edge in observations.edge_ids:
                 if edge.CostTotal > 100:
                     check_again = True
-                    # trim the cell sequence here
                     # find the train to be stopped
                     id = np.argmax(edge.CostPerTrain)
                     t_id = edge.Trains[id]
+
+                    # found the edge and the train for collision
+                    collision_entry_point = edge.Cells[0] if edge.TrainsDir[id] == 0 else edge.Cells[-1]
+                    prev_exit_point = [num if item[0] == collision_entry_point[0] and item[1] == collision_entry_point[1]
+                                       else 0
+                                       for num, item in enumerate(self.cells_sequence[t_id])]
+
+
+                    #pos =
+                    # find the entering cell and one before that
+                    # find the edge which contains this cell
+                    # manipulate this to stop the train on this edge before exit
+
+
                     time = edge.TrainsTime[id][0]
 
-                    self.cells_sequence[t_id][time:] = [tuple((0,0))] * (len(self.cells_sequence[t_id])-time)
 
-                    self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
 
-                    print("here")
+                    #self.cells_sequence[t_id][time-1:] = [self.cells_sequence[t_id][time]] * (len(self.cells_sequence[t_id])-time)
+                    #self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
+
+                    dir_opp = 1 if edge.TrainsDir[id] == 0 else 0
+
+                    end_time = np.max([item[1] if edge.TrainsDir[num] == dir_opp else 0 for num, item in enumerate(edge.TrainsTime)])
+
+                    self.time_at_cell[t_id][(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]] = end_time + 1 - time + 1
+
+                    #mul = (len(self.time_at_cell[t_id])-(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0])
+                    #value = [1.0] * mul
+                    #self.time_at_cell[t_id][int((np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]):] = value
+
 
             # make a copy of base_graph for reusability
-            # ************************************
-            # copy construction for the object
             observations = copy.deepcopy(self.base_graph)
             observations = self.populate_graph(observations)
+            #ob_list.append(observations)
+            local_copy = copy.deepcopy(self.time_at_cell)
+            #time_update_list.append(local_copy)
 
-            # set check again to False
-            # else: optimize
-
-        return observations
+        return ob_list
