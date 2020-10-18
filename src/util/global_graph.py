@@ -4,6 +4,14 @@ import numpy as np
 
 class g_edge:
     def __init__(self, node1, node2, node1_id, node2_id, traj):
+        """
+
+        :param node1:
+        :param node2:
+        :param node1_id:
+        :param node2_id:
+        :param traj:
+        """
         self.A = node1
         self.B = node2
         self.A_node = node1_id
@@ -17,107 +25,106 @@ class g_edge:
         self.CostPerTrain = []
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
+        self.Delay = []
 
     def __str__(self):
+        """
+
+        :return:
+        """
         return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)# + ' Cells: ' + str(self.Cells)
 
     def setCosts(self):
+        """
+
+        :return:
+        """
 
         self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
         self.CostCollisionLockTotal = 0
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
 
-        #if len(self.Trains) > 1:
-
         self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
-        for t_num, t_id in enumerate(self.Trains):
-            for c_t_num, c_t_id in enumerate(self.Trains):
+        for agent_pos_id, agent_id in enumerate(self.Trains):
+            for c_agent_pos_id, c_agent_id in enumerate(self.Trains):
                 # if the train is not compared with itself and
                 # they have opposing direction
-                if t_id != c_t_id and self.TrainsDir[t_num] != self.TrainsDir[c_t_num]:
+                if agent_id != c_agent_id and self.TrainsDir[agent_pos_id] != self.TrainsDir[c_agent_pos_id]:
                     # check the amount of time overlap
 
                     # find the max time for first Train
-                    if self.TrainsTime[t_num][1] > self.TrainsTime[c_t_num][1]:
-                        tmp = np.zeros((self.TrainsTime[t_num][1]+1))
+                    if self.TrainsTime[agent_pos_id][1] > self.TrainsTime[c_agent_pos_id][1]:
+                        tmp = np.zeros((self.TrainsTime[agent_pos_id][1] + 1))
                     else:
-                        tmp = np.zeros((self.TrainsTime[c_t_num][1] + 1))
+                        tmp = np.zeros((self.TrainsTime[c_agent_pos_id][1] + 1))
 
-                    for i in range(self.TrainsTime[t_num][0], self.TrainsTime[t_num][1]+1):
+                    for i in range(self.TrainsTime[agent_pos_id][0], self.TrainsTime[agent_pos_id][1]+1):
                         tmp[i] += 1
 
-                    for i in range(self.TrainsTime[c_t_num][0], self.TrainsTime[c_t_num][1]+1):
+                    for i in range(self.TrainsTime[c_agent_pos_id][0], self.TrainsTime[c_agent_pos_id][1]+1):
                         tmp[i] += 1
 
-                    if np.max(tmp) > 1:
-                        self.CollisionLockMatrix[t_num][c_t_num] = 1
+                    if np.max(tmp) > 1 and self.TrainsTime[agent_pos_id][0] != 0:
+                        self.CollisionLockMatrix[agent_pos_id][c_agent_pos_id] = 1
 
-                        #self.CollisionLockMatrix.append([c_t_num, t_num])
 
                     # find the max time for second Train
-
-
-                    #print("Check time overlap")
         # surely trains are on the same section
         # check if they are in opposite direction
         # if yes check if they have overlap of time
 
-        #self.CostCollisionLockTotal = (100 * np.count_nonzero(self.CollisionLockMatrix)/2)
-
         for i, item in enumerate(self.TrainsTime):
 
             if item[0] != 0:
-                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
-                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 50
+                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*10000 + abs(item[1] - item[0]))
+                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 5000
 
             else:
-                self.CostPerTrain.append(abs(item[1] - item[0]))
-
-            #self.CostCollisionLockTotal = np.count_nonzero(self.CollisionLockMatrix[i])*100
+                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*10000 + abs(item[1] - item[0]))
+                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 5000
 
             self.CostTransitionTimeTotal += abs(item[1] - item[0])
 
         self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
 
-        #print("here")
-
-        #else:
-        #    for i, item in enumerate(self.TrainsTime):
-
-        #        self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*100 + abs(item[1] - item[0]))
-
-        #        self.CostTransitionTimeTotal += abs(item[1] - item[0])
-
-        #    self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
-
 
 
 class g_vertex:
     def __init__(self, node):
+        """
+
+        :param node:
+        """
         self.id = node
         self.edges = []
         self.transitions = []
 
     def __str__(self):
+        """
+
+        :return:
+        """
         return ' ID: ' + str(self.id)
 
 
 class Global_Graph:
     def __init__(self):
+        """
+        """
         self.vert_dict = {}
-
-        # Below are redundant of each other
-        # this has only a list of string values for edges
-        #self.edge_dict = []
-        # this has edge objects created and stored
         self.edge_ids = []
 
         self.num_vertices = 0
         self.num_edges = 0
+
         self.CostTotalEnv = 0
 
     def setCosts(self):
+        """
+
+        :return:
+        """
         for edge in self.edge_ids:
             edge.setCosts()
 
@@ -129,8 +136,12 @@ class Global_Graph:
 
 
     def add_vertex(self, node):
+        """
+
+        :param node:
+        :return:
+        """
         if node not in self.vert_dict.keys():
-            #print("adding vertex ", self.num_vertices, node)
             self.num_vertices = self.num_vertices + 1
             new_vertex = g_vertex(node)
             self.vert_dict[node] = new_vertex
@@ -140,12 +151,17 @@ class Global_Graph:
 
 
     def add_edge(self, frm, to, frm_id, to_id, traj):
+        """
+
+        :param frm:
+        :param to:
+        :param frm_id:
+        :param to_id:
+        :param traj:
+        :return:
+        """
         # an edge can be added as follows
         #   both the vertices must exist
-        #if [frm, to, traj, []] not in self.edge_dict and [to, frm, traj[::-1], []] not in self.edge_dict:
-        #    #print("adding edge between ", self.num_edges, frm, to)#
-        #    self.edge_dict.append([frm, to, traj, []])
-        #    self.num_edges += 1
 
         found = False
         for item in self.edge_ids:
