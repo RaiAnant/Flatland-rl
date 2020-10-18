@@ -20,18 +20,21 @@ from collections import defaultdict
 
 from src.graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
-
+from src.optimizer import optimize, get_action_dict
+from itertools import groupby
 
 import cv2
 
-
+#test_list = [1, 4, 4, 4, 5, 6, 7, 4, 3, 3, 9]
+#res = [[i, len(list(i_list))] for i, i_list in groupby(test_list)]
+#print(res)
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 17
+    NUMBER_OF_AGENTS = 20
     width = 25
     height = 25
     max_prediction_depth = 200
-    NUM_CITIES = 2
+    NUM_CITIES = 3
 
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
                                            grid_mode=False,
@@ -55,8 +58,8 @@ if __name__ == "__main__":
 
     for step in range(8 * (width + height + 20)):
 
-        obs = observation_builder.optimize(obs)
-        _action = observation_builder.get_action_dict(obs)
+        #obs = optimize(observation_builder, obs)
+        _action = get_action_dict(observation_builder, obs)
 
         next_obs, all_rewards, done, _ = env.step(_action)
 

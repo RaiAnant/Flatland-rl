@@ -46,27 +46,27 @@ class g_edge:
         self.CostTotal = 0
 
         self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
-        for t_num, t_id in enumerate(self.Trains):
-            for c_t_num, c_t_id in enumerate(self.Trains):
+        for agent_pos_id, agent_id in enumerate(self.Trains):
+            for c_agent_pos_id, c_agent_id in enumerate(self.Trains):
                 # if the train is not compared with itself and
                 # they have opposing direction
-                if t_id != c_t_id and self.TrainsDir[t_num] != self.TrainsDir[c_t_num]:
+                if agent_id != c_agent_id and self.TrainsDir[agent_pos_id] != self.TrainsDir[c_agent_pos_id]:
                     # check the amount of time overlap
 
                     # find the max time for first Train
-                    if self.TrainsTime[t_num][1] > self.TrainsTime[c_t_num][1]:
-                        tmp = np.zeros((self.TrainsTime[t_num][1]+1))
+                    if self.TrainsTime[agent_pos_id][1] > self.TrainsTime[c_agent_pos_id][1]:
+                        tmp = np.zeros((self.TrainsTime[agent_pos_id][1] + 1))
                     else:
-                        tmp = np.zeros((self.TrainsTime[c_t_num][1] + 1))
+                        tmp = np.zeros((self.TrainsTime[c_agent_pos_id][1] + 1))
 
-                    for i in range(self.TrainsTime[t_num][0], self.TrainsTime[t_num][1]+1):
+                    for i in range(self.TrainsTime[agent_pos_id][0], self.TrainsTime[agent_pos_id][1]+1):
                         tmp[i] += 1
 
-                    for i in range(self.TrainsTime[c_t_num][0], self.TrainsTime[c_t_num][1]+1):
+                    for i in range(self.TrainsTime[c_agent_pos_id][0], self.TrainsTime[c_agent_pos_id][1]+1):
                         tmp[i] += 1
 
-                    if np.max(tmp) > 1 and self.TrainsTime[t_num][0] != 0:
-                        self.CollisionLockMatrix[t_num][c_t_num] = 1
+                    if np.max(tmp) > 1 and self.TrainsTime[agent_pos_id][0] != 0:
+                        self.CollisionLockMatrix[agent_pos_id][c_agent_pos_id] = 1
 
 
                     # find the max time for second Train
