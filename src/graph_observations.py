@@ -28,10 +28,10 @@ from flatland.core.grid.grid4_utils import get_new_position
 from flatland.core.grid.grid_utils import coordinate_to_position, distance_on_rail, position_to_coordinate
 from flatland.utils.ordered_set import OrderedSet
 
-
 from src.priority import assign_priority
 from src.util.graph import Graph
 from src.util.global_graph import Global_Graph
+
 
 class GraphObsForRailEnv(ObservationBuilder):
     """
@@ -45,7 +45,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.max_prediction_depth = 0
         self.prediction_dict = {}  # Dict handle : list of tuples representing prediction steps
         self.predicted_pos = {}  # Dict ts : int_pos_list
-        self.predicted_pos_list = {} # Dict handle : int_pos_list
+        self.predicted_pos_list = {}  # Dict handle : int_pos_list
         self.predicted_pos_coord = {}  # Dict ts : coord_pos_list
         self.predicted_dir = {}  # Dict ts : dir (float)
         self.num_active_agents = 0
@@ -113,7 +113,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         :return:
         """
 
-        forks = set() # Set of nodes as tuples/coordinates
+        forks = set()  # Set of nodes as tuples/coordinates
         # Identify cells hat are nodes (have switches)
         for i in range(self.env.height):
             for j in range(self.env.width):
@@ -155,6 +155,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                 self.num_active_agents += 1
         """
 
+        # if len(self.prediction_dict.keys())==0:
         self.prediction_dict = self.predictor.get()
         # Useful to check if occupancy is correctly computed
         self.cells_sequence, self.time_at_cell = self.predictor.compute_cells_sequence(self.prediction_dict)
@@ -206,21 +207,21 @@ class GraphObsForRailEnv(ObservationBuilder):
             traj.insert(0, self.env.agents[a].position if self.env.agents[a].position is not None else self.env.agents[
                 a].initial_position)
 
-            #initial_position = self.env.agents[a].initial_position
+            # initial_position = self.env.agents[a].initial_position
 
             start_timestamp = 0
             traj_pos_end_counter = 0
 
             while len(traj) > 1:
-
+                # if (nan, nan)
                 for edge in observations.edge_ids:
                     if traj[0] in edge.Cells \
                             and traj[1] in edge.Cells:
 
-                        #traj.insert(0, initial_position)
+                        # traj.insert(0, initial_position)
 
                         agent_pos_on_edge = [i for i, tupl in enumerate(edge.Cells)
-                                    if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
+                                             if tupl[0] == traj[0][0] and tupl[1] == traj[0][1]][0]
 
                         # step_dir is the value is either 1 or -1 being the step in either direction of the edge
                         if 0 < agent_pos_on_edge < len(edge.Cells) - 1:
@@ -233,8 +234,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                         elif agent_pos_on_edge == len(edge.Cells) - 1:
                             step_dir = -1
 
-                        edge_cells = edge.Cells[agent_pos_on_edge:len(edge.Cells)] if step_dir == 1 else edge.Cells[0:agent_pos_on_edge+1][::-1]
-                        #edge_cells.insert(0,initial_position)
+                        edge_cells = edge.Cells[agent_pos_on_edge:len(edge.Cells)] if step_dir == 1 else edge.Cells[
+                                                                                                         0:agent_pos_on_edge + 1][
+                                                                                                         ::-1]
+                        # edge_cells.insert(0,initial_position)
 
                         traj_pos_end = 0
 
@@ -260,7 +263,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                                 # if the current positions are equal then proceed in trajectory
                                 if traj[traj_pos_end] == edge_cells[traj_pos_end]:
                                     traj_pos_end += 1
-                                    #edge_pos_end += 1
+                                    # edge_pos_end += 1
                                 else:
                                     break
                             else:
@@ -275,14 +278,15 @@ class GraphObsForRailEnv(ObservationBuilder):
                             traj_pos_end -= 1
                             end_timestamp = int(start_timestamp
                                                 + np.sum(self.time_at_cell[a][int(traj_pos_end_counter)
-                                                                              :int(traj_pos_end_counter)+traj_pos_end])
+                                                                              :int(
+                                traj_pos_end_counter) + traj_pos_end])
                                                 * 1 / self.env.agents[a].speed_data['speed'])
 
                             if start_timestamp != end_timestamp:
                                 edge.Trains.append(a)
                                 edge.TrainsTime.append(sorted([start_timestamp, end_timestamp]))
                                 edge.TrainsDir.append(0 if step_dir == 1 else 1)
-                                #start_timestamp = int(start_timestamp
+                                # start_timestamp = int(start_timestamp
                                 #                    + np.sum(self.time_at_cell[a][int(traj_pos_end_counter)
                                 #                                                  :int(traj_pos_end_counter) + traj_pos_end-1])
                                 #                    * 1 / self.env.agents[a].speed_data['speed'])
@@ -291,8 +295,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                         traj_pos_end_counter += traj_pos_end
                         break
 
-                initial_position = traj[traj_pos_end-1]
-                traj = traj[traj_pos_end:]
+                # initial_position = traj[traj_pos_end-1]
+                try:
+                    traj = traj[traj_pos_end:]
+                except:
+                    print("caught")
 
         # Now Build the the collision lock matrix
         observations.setCosts()
@@ -347,7 +354,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         # add the starting node if the agent starts from a fork which is highly improbable
 
         if total_transitions > 2:
-            self.base_graph.add_vertex(str(init_pos[0])+","+str(init_pos[1]))
+            self.base_graph.add_vertex(str(init_pos[0]) + "," + str(init_pos[1]))
             added_vertex.append(init_pos)
 
         while len(pending_to_explore):
@@ -357,34 +364,36 @@ class GraphObsForRailEnv(ObservationBuilder):
             for item in next_pos:
                 if item[0] not in added_vertex:
                     if item[1] == 1:
-                        self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
+                        self.base_graph.add_vertex(str(item[0][0]) + "," + str(item[0][1]))
                         added_vertex.append(item[0])
 
                     elif item[1] > 2:
-                        self.base_graph.add_vertex(str(item[0][0])+","+str(item[0][1]))
+                        self.base_graph.add_vertex(str(item[0][0]) + "," + str(item[0][1]))
                         added_vertex.append(item[0])
                         pending_to_explore.append(item[0])
 
                 if item[1] == 1:
-                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
-                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+                    source_node = self.base_graph.vert_dict[str(current[0]) + "," + str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0]) + "," + str(item[0][1])]
 
-                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+                    added_edge = self.base_graph.add_edge(str(current[0]) + "," + str(current[1]),
+                                                          str(item[0][0]) + "," + str(item[0][1]), source_node,
+                                                          dest_node, item[2])
 
                     source_node.edges.append(added_edge)
                     dest_node.edges.append(added_edge)
 
 
                 elif item[1] > 2:
-                    source_node = self.base_graph.vert_dict[str(current[0])+","+str(current[1])]
-                    dest_node = self.base_graph.vert_dict[str(item[0][0])+","+str(item[0][1])]
+                    source_node = self.base_graph.vert_dict[str(current[0]) + "," + str(current[1])]
+                    dest_node = self.base_graph.vert_dict[str(item[0][0]) + "," + str(item[0][1])]
 
-
-                    added_edge = self.base_graph.add_edge(str(current[0])+","+str(current[1]), str(item[0][0])+","+str(item[0][1]), source_node, dest_node, item[2])
+                    added_edge = self.base_graph.add_edge(str(current[0]) + "," + str(current[1]),
+                                                          str(item[0][0]) + "," + str(item[0][1]), source_node,
+                                                          dest_node, item[2])
 
                     source_node.edges.append(added_edge)
                     dest_node.edges.append(added_edge)
-
 
         return "built base graph"
 
@@ -443,7 +452,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     temp, temp1 = self._step_extend(position, direction)
 
-                    return temp, traj+temp1
+                    return temp, traj + temp1
             else:
                 return [position, total_transitions], traj
 
@@ -456,7 +465,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         init_position = current
         node_list = []
 
-        for direction in [0,1,2,3]:
+        for direction in [0, 1, 2, 3]:
 
             traj = []
             traj.append(init_position)
@@ -485,7 +494,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                     # if straight : means dead end
                     # if simple left : explore recursively by changing direction to left
                     # if simple right : explore recursively by changing direction to right
-                    #position = get_new_position(position, direction)
+                    # position = get_new_position(position, direction)
 
                     cell_transitions_bitmap = np.asarray([int(item) for item in cell_transitions_bitmap[2:]])
                     pos = np.where(cell_transitions_bitmap == 1)
@@ -496,7 +505,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         traj.append(position)
 
                     else:
-                        if pos[0] in [1,14] or pos[1] in [1, 14]:  # simple right
+                        if pos[0] in [1, 14] or pos[1] in [1, 14]:  # simple right
                             if direction == 0:
                                 direction = (direction + 1) % 4
                             elif direction == 3:
@@ -522,11 +531,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                         temp, temp1 = self._step_extend(position, direction)
                         traj = traj + temp1
                         node_list.append([temp[0], temp[1], traj])
-                        #traj.append(*temp1)
+                        # traj.append(*temp1)
 
                         break
                 else:
-                    #print(" node found")
+                    # print(" node found")
                     node_list.append([position, total_transitions, traj])
                     break
 
@@ -541,7 +550,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         ob_list = []
         time_update_list = []
         ob_list.append(observations)
-        #comp_observations = copy.deepcopy(observations)
+        # comp_observations = copy.deepcopy(observations)
         check_again = True
         check_again_counter = 0
 
@@ -558,40 +567,172 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     # found the edge and the train for collision
                     collision_entry_point = edge.Cells[0] if edge.TrainsDir[id] == 0 else edge.Cells[-1]
-                    prev_exit_point = [num if item[0] == collision_entry_point[0] and item[1] == collision_entry_point[1]
-                                       else 0
-                                       for num, item in enumerate(self.cells_sequence[t_id])]
+                    prev_exit_point = [
+                        num if item[0] == collision_entry_point[0] and item[1] == collision_entry_point[1]
+                        else 0
+                        for num, item in enumerate(self.cells_sequence[t_id])]
 
-
-                    #pos =
+                    # pos =
                     # find the entering cell and one before that
                     # find the edge which contains this cell
                     # manipulate this to stop the train on this edge before exit
 
-
                     time = edge.TrainsTime[id][0]
 
-
-
-                    #self.cells_sequence[t_id][time-1:] = [self.cells_sequence[t_id][time]] * (len(self.cells_sequence[t_id])-time)
-                    #self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
+                    # self.cells_sequence[t_id][time-1:] = [self.cells_sequence[t_id][time]] * (len(self.cells_sequence[t_id])-time)
+                    # self.cells_sequence[t_id] = self.cells_sequence[t_id][:time+1]
 
                     dir_opp = 1 if edge.TrainsDir[id] == 0 else 0
 
-                    end_time = np.max([item[1] if edge.TrainsDir[num] == dir_opp else 0 for num, item in enumerate(edge.TrainsTime)])
+                    end_time = np.max(
+                        [item[1] if edge.TrainsDir[num] == dir_opp else 0 for num, item in enumerate(edge.TrainsTime)])
 
-                    self.time_at_cell[t_id][(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]] = end_time + 1 - time + 1
+                    self.time_at_cell[t_id][
+                        (np.where(np.asarray(prev_exit_point) != 0)[0] - 1)[0]] = end_time + 1 - time + 1
 
-                    #mul = (len(self.time_at_cell[t_id])-(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0])
-                    #value = [1.0] * mul
-                    #self.time_at_cell[t_id][int((np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]):] = value
-
+                    # mul = (len(self.time_at_cell[t_id])-(np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0])
+                    # value = [1.0] * mul
+                    # self.time_at_cell[t_id][int((np.where(np.asarray(prev_exit_point)!=0)[0]-1)[0]):] = value
 
             # make a copy of base_graph for reusability
             observations = copy.deepcopy(self.base_graph)
             observations = self.populate_graph(observations)
-            #ob_list.append(observations)
+            # ob_list.append(observations)
             local_copy = copy.deepcopy(self.time_at_cell)
-            #time_update_list.append(local_copy)
+            # time_update_list.append(local_copy)
 
         return ob_list
+
+    def is_new_route(self, node, cell_passed):
+        if (len(node.path) != 0 and node.path[0] != cell_passed) or (len(node.path) == 0 and cell_passed != node.children[0].node_id):
+            return True
+        return False
+
+    def get_alternate_paths(self, agent_id, node, collision_node, idx):
+        if node.is_blocked:
+            return None
+        is_new_route = self.is_new_route(node, self.cells_sequence[agent_id][idx + 1])
+        if node.node_id == collision_node and is_new_route:  # if at node that connects to collsion edge but the path doesnt lead to the collsion edge, add it as a possible route
+            return [node]
+
+        elif node.node_id == collision_node:  # if the node is the one with collision, block it from further exploration
+            node.is_blocked = True  # TODO : CHANGE BLOCKED IN TIME
+            return None
+
+        if idx != 0 and is_new_route:  # if the current route is not explored in cell sequence, add it as a possible route
+            return [node]
+
+        if len(node.path) != 0 and \
+                (node.node_id[0] - collision_node[0]) * (node.path[-1][0] - collision_node[0]) <= 0 and \
+                (node.node_id[1] - collision_node[1]) * (node.path[-1][1] - collision_node[1]) <= 0:  # check if the collision cell is present in the current tree node, and if it is, return None
+            node.is_blocked = True
+            return None
+
+        list = []
+        for child in node.children:  # explore the childrnen of the given node
+            if idx == 0:
+                val = self.get_alternate_paths(agent_id, child, collision_node, idx + len(node.path))
+            else:
+                val = self.get_alternate_paths(agent_id, child, collision_node, idx + len(node.path) + 1)
+
+            if val is not None:
+                if len(val) == 1:
+                    list = val + list
+                else:
+                    list = list + val
+
+        return list
+
+    def sort_key(self, x):
+        min_val = 100000
+        if len(x.TrainsTime) == 0 or x.CostTotal < 100:
+            return 100000
+        for time in x.TrainsTime:
+            if min_val > min(time[0], time[1]):
+                min_val = min(time[0], time[1])
+
+        # val /= len(x.TrainsTime)
+
+        return min_val
+
+    def rerouting(self, observations, agent_trees):
+        """
+
+        :return:
+        """
+
+        ob_list = []
+        time_update_list = []
+        ob_list.append(observations)
+        # comp_observations = copy.deepcopy(observations)
+        check_again = True
+        check_again_counter = 0
+
+        route_list = []
+
+        while check_again and check_again_counter < 10:
+            # check if the cost is within limits
+            check_again = False
+            check_again_counter += 1
+            observations.edge_ids.sort(key=self.sort_key)  # sort the edges on the basis of occourence of collision
+            agent_id = None
+            for edge in observations.edge_ids:
+                if edge.CostTotal > 100:
+                    check_again = True
+                    # find the train to be stopped
+                    id = np.argmax(edge.CostPerTrain)
+
+                    t_id = edge.Trains[id]  # train id to re-route
+
+                    agent_tree = agent_trees[t_id]
+
+                    agent_id = t_id
+                    # found the edge and the train for collision
+                    collision_entry_point = edge.Cells[0] if edge.TrainsDir[id] == 0 else edge.Cells[-1]
+                    prev_exit_point = [
+                        num if item[0] == collision_entry_point[0] and item[1] == collision_entry_point[1]
+                        else 0
+                        for num, item in enumerate(self.cells_sequence[t_id])]
+
+                    # pos =
+                    # find the entering cell and one before that
+                    # find the edge which contains this cell
+                    # manipulate this to stop the train on this edge before exit
+
+                    # time = edge.TrainsTime[id][0]
+
+                    paths = self.get_alternate_paths(t_id, agent_tree.root, collision_entry_point,0)  # get all the nodes in the tree with alternate path
+                    selected_path = paths[-1]  # pick the one at the max depth
+                    new_cell_seq = []
+                    idx = 0
+
+                    current_cell = self.cells_sequence[t_id][idx]
+
+                    while selected_path.node_id != current_cell:  # copy the cell_seq as it is until we reach the point of re-route
+                        new_cell_seq.append(current_cell)
+                        idx += 1
+                        current_cell = self.cells_sequence[t_id][idx]
+
+                    new_cell_seq.append(selected_path.node_id)  # add the new path cells
+                    new_cell_seq += selected_path.path
+                    temp = selected_path
+
+                    while len(temp.children) != 0 and len(new_cell_seq) < self.max_prediction_depth:
+                        temp = temp.children[0]
+                        new_cell_seq.append(temp.node_id)
+                        new_cell_seq += temp.path
+
+                    self.time_at_cell[t_id] = [1 / self.env.agents[t_id].speed_data['speed']] * len(
+                        new_cell_seq)  # update the cell seq and time at cells values
+                    self.cells_sequence[t_id] = new_cell_seq
+                    self.cells_sequence[t_id].append((0, 0))
+                    break
+
+            # make a copy of base_graph for reusability
+            observations = copy.deepcopy(self.base_graph)
+            observations = self.populate_graph(observations)  # create new observation from the changes
+
+            route_list.append((agent_id, self.cells_sequence[agent_id]))
+            local_copy = copy.deepcopy(self.time_at_cell)
+
+        return check_again_counter < 100, route_list

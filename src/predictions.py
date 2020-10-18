@@ -148,7 +148,7 @@ class ShortestPathPredictorForRailEnv(PredictionBuilder):
         for a in agents:
             step_size = 1/a.speed_data['speed']
             for step in prediction_dict[a.handle]:
-                if step[4] != RailEnvActions.STOP_MOVING:
+                if step[4] != RailEnvActions.STOP_MOVING and not np.isnan(step[1]):
                     cell_pos = (step[1], step[2])  # Takes (yi, xi)
                     cells_sequence[a.handle].append(cell_pos)
                     time_at_cell[a.handle].append(step_size)

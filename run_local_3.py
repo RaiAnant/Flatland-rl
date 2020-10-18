@@ -16,11 +16,13 @@ from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.observations import TreeObsForRailEnv
 import copy
 
+from src.util.tree_builder import Agent_Tree
 
 from src.graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
 import cv2
+
 
 class stoch_data:
     def __init__(self, malfunction_rate, malfunction_min_duration, malfunction_max_duration):
@@ -79,11 +81,24 @@ def naive_solver(env, obs):
 
     return actions
 
+
+def reroute_solver(cell_sequence, actions, env, agent_idx):
+    for k in actions.keys():
+        if 0 < actions[k] and actions[k] < 4 and env.agents[k].position and agent_idx[k] < len(cell_sequence[k]):
+            for idx, direction in enumerate([(env.agents[k].direction + i) % 4 for i in range(-1, 2)]):
+                new_position = get_new_position(env.agents[k].position, direction)
+                if new_position == cell_sequence[k][int(agent_idx[k])]:
+                    actions[k] = idx + 1
+                    # agent_idx[k]+=1
+                    break
+    return actions
+
+
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 17
-    width = 30
-    height = 30
-    max_prediction_depth = 30
+    NUMBER_OF_AGENTS = 8
+    width = 40
+    height = 35
+    max_prediction_depth = 80
 
     rail_generator = sparse_rail_generator(max_num_cities=5,
                                            grid_mode=False,
@@ -105,14 +120,53 @@ if __name__ == "__main__":
     env_renderer = RenderTool(env)
     obs, _ = env.reset()
 
-    status = observation_builder.optimize(obs)
-    print("Success") if status else print("fail")
+    # status = observation_builder.optimize(obs)
+    # print("Success") if status else print("fail")
+    env_renderer.render_env(show=True,
+                            show_inactive_agents=False,
+                            show_predictions=True,
+                            show_observations=True,
+                            frames=True,
+                            return_image=True)
+
+    tree_dict = {}
+    agent_idx = {}
+    for idx, agent in enumerate(env.agents):
+        tree = Agent_Tree(idx, agent.initial_position)
+        tree.build_tree(obs, env)
+        tree_dict[idx] = tree
+        agent_idx[idx] = 0
+
+    success, rout_list = observation_builder.rerouting(obs, tree_dict)  # returns list of re-routes
+    if success:
+        print("Success!")
+    else:
+        print("Failed!")
+
+    for id, route in rout_list:  # viualising the re-routes
+        env.dev_pred_dict[id] = route
+        env_renderer.render_env(show=True,
+                                show_inactive_agents=False,
+                                show_predictions=True,
+                                show_observations=True,
+                                frames=True,
+                                return_image=True)
+        time.sleep(1.0)
+
+    cell_sequence = observation_builder.cells_sequence.copy()  # getting the final routes of the agents
 
     for step in range(8 * (width + height + 20)):
 
         _action = naive_solver(env, obs)
 
+        _action = reroute_solver(cell_sequence, _action, env,
+                                 agent_idx)  # checking the action against new routs to update accordingly
+
         for k in _action.keys():
+
+            if env.agents[k].status == 1:
+                # env.dev_pred_dict[k] = cell_sequence[k][agent_idx[k]:]
+                agent_idx[k] += env.agents[k].speed_data['speed']
             if env.agents[k].position is None:
                 continue
 
@@ -122,6 +176,10 @@ if __name__ == "__main__":
 
         next_obs, all_rewards, done, _ = env.step(_action)
 
+        for k in _action.keys():  # for changing predict_dict on the basis of rerouted path
+            if len(cell_sequence[k][int(agent_idx[k]):]) > 1:
+                env.dev_pred_dict[k] = cell_sequence[k][int(agent_idx[k]):]
+
         print("Rewards: {}, [done={}]".format(all_rewards, done))
 
         img = env_renderer.render_env(show=True,
@@ -129,9 +187,9 @@ if __name__ == "__main__":
                                       show_predictions=True,
                                       show_observations=True,
                                       frames=True,
-                                      return_image= True)
+                                      return_image=True)
 
-        cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
+        cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
 
         time.sleep(1.0)
 
