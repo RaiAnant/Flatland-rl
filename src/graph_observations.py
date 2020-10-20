@@ -56,7 +56,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.cur_graph = None
         self.ts = -1
         self.agent_prev = defaultdict(list)
-        self.agent_position_data = None
+        self.agent_position_data = defaultdict(list)
         self.cur_pos_edge = defaultdict()
 
     def set_env(self, env: Environment):
@@ -186,6 +186,14 @@ class GraphObsForRailEnv(ObservationBuilder):
                 self.time_at_cell[a] = [step_size]*len(self.cells_sequence[a])
                 self.malfunction_time[a] = [0]*len(self.cells_sequence[a])
                 self.introduced_delay_time[a] = [0]*len(self.cells_sequence[a])
+
+
+            # check if multiple trains start at the same spot. introduce intial delay
+            start_pos = []
+            for a in self.env.agents:
+                self.introduced_delay_time[a.handle][0] += start_pos.count(a.initial_position)
+                start_pos.append(a.initial_position)
+
 
             self.max_prediction_depth = self.predictor.max_depth
 
@@ -343,6 +351,10 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         observations.setCosts()
         observations = copy.deepcopy(observations)
+
+        #sorted_list = sorted(observations.edge_ids, key=lambda x: x.CostTotal, reverse=True)
+        #optimization_candidate = [edge for edge in sorted_list if edge.CostTotal > 10000]
+
 
         return observations
 
