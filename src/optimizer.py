@@ -457,10 +457,24 @@ def get_action_dict_junc(observation_builder, obs):
             if observation_builder.cur_pos_list[a][2]:
                 # check first if the agent is allowed to move to the junction
                 #target_vertex = obs.vertices[str(next_position)[1:-1]]
+                current_vertex = [obs.vertices[item] for item in obs.vertices if cur_position in obs.vertices[item].Cells][0]
                 target_vertex = [obs.vertices[item] for item in obs.vertices if next_position in obs.vertices[item].Cells][0]
+                print(target_vertex.Type)
                 agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
+                target_edge_vertex = [item[1] for item in target_vertex.Links if a in item[1].Trains
+                                      and item[1] != current_vertex]
+                if len(target_edge_vertex):
+                    agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains) if
+                                                item == a]
+                    conflict_status = target_edge_vertex[0].CostPerTrain[agent_pos_target_edge_vertex[0]]
+                else:
+                    conflict_status = 0
 
-                if observation_builder.ts+1 >= target_vertex.TrainsTime[agent_pos_id][0]:
+
+                if conflict_status > 10000:
+                    actions[a] = 4
+
+                elif observation_builder.ts+1 >= target_vertex.TrainsTime[agent_pos_id][0]:
                     cur_direction = observation_builder.env.agents[a].direction
                     if cur_position[0] == next_position[0]:
                         if cur_position[1] > next_position[1]:
