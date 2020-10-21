@@ -111,43 +111,47 @@ def optimize_old_graph(observation_builder, observations):
 
 
 
-def optimize(observation_builder, observations):
+def optimize(observation_builder, obs, node_type="edge"):
     """
 
     :return: List of observations containing resulting graph after each optimization step
     """
 
-    check_again = True
     check_again_counter = 0
 
-    while check_again and check_again_counter < 100:
+    #outer_observation_structure = []
+    #observations = copy.deepcopy(obs)
+    #outer_observation_structure.append([obs.CostTotalEnv, observations])
+
+
+    while check_again_counter < 20:
         # check if the cost is within limits
-        check_again = False
+
+        observations = copy.deepcopy(obs)
+
         check_again_counter += 1
 
         sorted_list = sorted(observations.vertices, key=lambda x: observations.vertices[x].CostTotal, reverse=True)
-        optimization_candidate = [observations.vertices[vertex] for vertex in sorted_list
-                                  if observations.vertices[vertex].CostTotal > 10000]
+        optimization_candidate = [vertex for vertex in sorted_list
+                                  if observations.vertices[vertex].CostTotal > 10000
+                                  and observations.vertices[vertex].Type == node_type]
 
-        for vertex in optimization_candidate:
+        if not len(optimization_candidate):
+            break
 
-            edge_copy = copy.deepcopy(vertex.CostPerTrain)
-            trains_count = len(vertex.CostPerTrain)
-            opt_try = 0
+        outer_observation_structure = []
+        for vert in optimization_candidate:
 
-            while True:
+            observations = copy.deepcopy(obs)
 
-                check_again = True
+            trains = observations.vertices[vert].Trains
 
-                try:
-                    # find the train to be stopped
-                    id = np.argmax(edge_copy)
-                    agent_id = vertex.Trains[id]
-                except:
-                    print("Train IDS not found during optimize")
+            inner_observation_structure = []
 
+            for id, agent_id in enumerate(trains):
 
-
+                observations = copy.deepcopy(obs)
+                vertex = observations.vertices[vert]
 
                 collision_entry_point = vertex.Links[vertex.TrainsDir[id]][0]
 
@@ -191,7 +195,7 @@ def optimize(observation_builder, observations):
 
                     occupancy = np.sum(bitmap, axis=0)
 
-                    if vertex.TrainsTime[id][0] < observation_builder.ts:
+                    if vertex.TrainsTime[id][1] < observation_builder.ts:
                         print("seems like the optimization cannot be done ahead in time")
 
                     # we do not want a delay for the final edge if the number of matching cells in the trajectory is not just the final one
@@ -208,8 +212,9 @@ def optimize(observation_builder, observations):
 
                             if vertex.Type == "junction":
                                 vertex.TrainsTime[id] = [number, number + vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]]
-                                observations = observation_builder.update_for_traffic(observations)
+                                observations = observation_builder.update_for_delay(observations, agent_id)
                                 observations.setCosts()
+                                inner_observation_structure.append([observations.CostTotalEnv, observations])
                             elif vertex.Type== "edge":
 
                                 connected_vertices = [item[1] for item in vertex.Links if agent_id in item[1].Trains]
@@ -225,21 +230,48 @@ def optimize(observation_builder, observations):
 
                                         connected_vertex.TrainsTime[id][0] += difference
                                         connected_vertex.TrainsTime[id][1] += difference
-                                observations = observation_builder.update_for_traffic(observations)
+                                observations = observation_builder.update_for_delay(observations, agent_id)
                                 observations.setCosts()
-
+                                inner_observation_structure.append([observations.CostTotalEnv, observations])
 
                             break
-                    break
 
-                elif opt_try < trains_count:
-                    edge_copy[id] = 100
                 else:
-                    break
+                    print("here")
 
-                opt_try += 1
+            if len(inner_observation_structure) > 1:
+                sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
+                obs = sorted_cost_list[0][1]
+            elif len(inner_observation_structure) == 1:
+                obs = inner_observation_structure[0][1]
+        """
+            #min_cost = []
+            if len(inner_observation_structure) > 1:
+                sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
+                outer_observation_structure.append(sorted_cost_list[0])
+            elif len(inner_observation_structure) == 1:
+                outer_observation_structure.append(inner_observation_structure[0])
+            #print("Here")
 
-    return observations
+        if len(outer_observation_structure) > 1:
+            sorted_outer_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
+            obs = sorted_outer_cost_list[0][1]
+        elif len(outer_observation_structure) == 1:
+            obs = outer_observation_structure[0][1]
+        """
+
+        #obs = sorted(outer_observation_structure, key=lambda x: x[0], reverse=False)[0][1]
+        #sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
+        #outermost_observation_structure.append([sorted_cost_list[0][1]])
+        #print("Here")
+
+        # select from the inner structure here the best one
+        # it can also be the old one
+        # what comes out of the vertex
+        #
+    # find the best of outer and send
+    return obs
+
 
 
 
@@ -422,7 +454,7 @@ def get_action_dict_junc(observation_builder, obs):
 
         if next_position != tuple((0,0)):
 
-            if observation_builder.cur_pos_list[a][2] or True:
+            if observation_builder.cur_pos_list[a][2]:
                 # check first if the agent is allowed to move to the junction
                 #target_vertex = obs.vertices[str(next_position)[1:-1]]
                 target_vertex = [obs.vertices[item] for item in obs.vertices if next_position in obs.vertices[item].Cells][0]

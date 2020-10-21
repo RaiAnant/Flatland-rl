@@ -193,12 +193,29 @@ class GraphObsForRailEnv(ObservationBuilder):
                                  else tuple((0,0))
                 self.agent_position_data[a.handle].append(current_position)
 
+        """
+        if self.ts == 0:
+            self.observations = copy.deepcopy(self.base_graph)
+            observations = self.observations
+            self.observations = self.populate_graph(observations)
+            self.observations.setCosts()
+
+
+        observations = self.observations
+        status = self.is_update_required(observations)
+
+        if status:
+            self.observations = self.update_for_traffic(observations)
+            self.observations.setCosts()
+        """
+
         observations = copy.deepcopy(self.base_graph)
         status = self.is_update_required(observations)
 
         if status:
             self.observations = self.populate_graph(observations)
             self.observations.setCosts()
+
 
         return self.observations
 
@@ -691,7 +708,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
 
 
-    def update_for_traffic(self, observations):
+    def update_for_delay(self, observations, a):
         """
         Inherited method used for pre computations.
 
@@ -699,123 +716,124 @@ class GraphObsForRailEnv(ObservationBuilder):
         """
 
         agent_initial_positions = defaultdict(list)
-        for a in self.env.agents:
-            new_edge = [observations.vertices[vertex] for vertex in observations.vertices \
-                                                if a.initial_position in observations.vertices[vertex].Cells][0]
-            agent_initial_positions[a.handle] = [a.initial_position, new_edge]
+        agent = self.env.agents[a]
+        #for a in self.env.agents:
+        new_edge = [observations.vertices[vertex] for vertex in observations.vertices \
+                                            if agent.initial_position in observations.vertices[vertex].Cells][0]
+        agent_initial_positions[agent.handle] = [agent.initial_position, new_edge]
 
 
-        for a in range(self.env.number_of_agents):
+        #for a in range(self.env.number_of_agents):
 
-            # this tells up how far we are in the trajectory
-            # how many time steps we spent on each cell
-            # it considers every train to be on the initial position until they move
-            # weather READY_TO_MOVE or ACTIVE
+        # this tells up how far we are in the trajectory
+        # how many time steps we spent on each cell
+        # it considers every train to be on the initial position until they move
+        # weather READY_TO_MOVE or ACTIVE
 
-            # Build one vector of time spent on already travelled trajectory
-            # and the planned one
-            agent_time_stepwise = [int(1/self.env.agents[a].speed_data['speed'])]*len(self.cells_sequence[a])
-            time_data = [len(list(i_list)) for i, i_list in groupby(self.agent_position_data[a])]
-            agent_time_stepwise = time_data + agent_time_stepwise[len(time_data):]
+        # Build one vector of time spent on already travelled trajectory
+        # and the planned one
+        agent_time_stepwise = [int(1/self.env.agents[a].speed_data['speed'])]*len(self.cells_sequence[a])
+        time_data = [len(list(i_list)) for i, i_list in groupby(self.agent_position_data[a])]
+        agent_time_stepwise = time_data + agent_time_stepwise[len(time_data):]
 
-            # initial state
-            start_timestamp = 0
-            agent_current_vertex = agent_initial_positions[a][1]
-            agent_prev_vertex = None
-            agent_trajectory = self.cells_sequence[a]
-            agent_pos_on_traj = 0
-            end_timestamp = 0
+        # initial state
+        start_timestamp = 0
+        agent_current_vertex = agent_initial_positions[a][1]
+        agent_prev_vertex = None
+        agent_trajectory = self.cells_sequence[a]
+        agent_pos_on_traj = 0
+        end_timestamp = 0
 
-            # start with the beginning
-            # find next exit on trajectory
-            while(True):
+        # start with the beginning
+        # find next exit on trajectory
+        while(True):
 
-                agent_next_vertex = None
+            agent_next_vertex = None
 
-                # check what sort of vertex the agent is at right now.
-                if agent_current_vertex.Type == "junction":
+            # check what sort of vertex the agent is at right now.
+            if agent_current_vertex.Type == "junction":
 
-                    agent_next_position = agent_trajectory[agent_pos_on_traj+1]
-                    agent_next_pos_on_traj = agent_pos_on_traj+1
+                agent_next_position = agent_trajectory[agent_pos_on_traj+1]
+                agent_next_pos_on_traj = agent_pos_on_traj+1
 
+                agent_next_vertex, agent_next_dir = \
+                            [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
+                                    if agent_next_position in item[1].Cells][0]
+
+            elif agent_current_vertex.Type == "edge" and \
+                    len(agent_current_vertex.Cells) == 1:
+
+                agent_next_position = agent_trajectory[agent_pos_on_traj+1]
+                agent_next_pos_on_traj = agent_pos_on_traj+1
+
+                if agent_current_vertex.Cells[0] != agent_trajectory[-2]:
                     agent_next_vertex, agent_next_dir = \
                                 [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
                                         if agent_next_position in item[1].Cells][0]
 
-                elif agent_current_vertex.Type == "edge" and \
-                        len(agent_current_vertex.Cells) == 1:
+                else:
+                    break
 
-                    agent_next_position = agent_trajectory[agent_pos_on_traj+1]
-                    agent_next_pos_on_traj = agent_pos_on_traj+1
+            elif agent_current_vertex.Type == "edge":
 
-                    if agent_current_vertex.Cells[0] != agent_trajectory[-2]:
-                        agent_next_vertex, agent_next_dir = \
-                                    [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
-                                            if agent_next_position in item[1].Cells][0]
+                if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1:]:
 
-                    else:
-                        break
+                    agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
+                                         if item[0] == agent_current_vertex.Cells[0]][0]
 
-                elif agent_current_vertex.Type == "edge":
+                    agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
 
-                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1:]:
-
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[0]][0]
-
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
-
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
+                    agent_next_pos_on_traj =  agent_pos_on_traj + \
+                                              [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
+                                if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
 
 
-                    elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj+1:]:
+                elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj+1:]:
 
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[-1]][0]
+                    agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
+                                         if item[0] == agent_current_vertex.Cells[-1]][0]
 
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
+                    agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
 
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
+                    agent_next_pos_on_traj =  agent_pos_on_traj + \
+                                              [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
+                                if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
 
-                    else:
-                        break
-
-
-                # found next vertex
-                if agent_next_vertex != None:
-                    if a in agent_next_vertex.Trains:
-
-                        pos_on_first_edge = [num for num,item in enumerate(agent_current_vertex.Trains) if item == a][0]
-                        pos_on_second_edge = [num for num,item in enumerate(agent_next_vertex.Trains) if item == a][0]
-
-                        first_time = agent_current_vertex.TrainsTime[pos_on_first_edge]
-                        second_time = agent_next_vertex.TrainsTime[pos_on_second_edge]
-
-                        if second_time[0] > first_time[1]:
-                            # a delay is probably added
-                            first_time[1] = second_time[0]
-
-                        elif second_time[0] < first_time[1]:
-                            shift = first_time[1] - second_time[0]
-                            second_time[0] += shift
-                            second_time[1] += shift
-
-                    else:
-                        break
                 else:
                     break
 
 
+            # found next vertex
+            if agent_next_vertex != None:
+                if a in agent_next_vertex.Trains:
+
+                    pos_on_first_edge = [num for num,item in enumerate(agent_current_vertex.Trains) if item == a][0]
+                    pos_on_second_edge = [num for num,item in enumerate(agent_next_vertex.Trains) if item == a][0]
+
+                    first_time = agent_current_vertex.TrainsTime[pos_on_first_edge]
+                    second_time = agent_next_vertex.TrainsTime[pos_on_second_edge]
+
+                    if second_time[0] > first_time[1]:
+                        # a delay is probably added
+                        first_time[1] = second_time[0]
+
+                    elif second_time[0] < first_time[1]:
+                        shift = first_time[1] - second_time[0]
+                        second_time[0] += shift
+                        second_time[1] += shift
+
+                else:
+                    break
+            else:
+                break
 
 
-                start_timestamp = end_timestamp
-                agent_prev_vertex = agent_current_vertex
-                agent_current_vertex = agent_next_vertex
-                agent_pos_on_traj = agent_next_pos_on_traj
+
+
+            start_timestamp = end_timestamp
+            agent_prev_vertex = agent_current_vertex
+            agent_current_vertex = agent_next_vertex
+            agent_pos_on_traj = agent_next_pos_on_traj
 
         return observations
 

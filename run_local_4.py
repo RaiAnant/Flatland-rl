@@ -28,7 +28,7 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 10
+    NUMBER_OF_AGENTS = 25
     width = 25
     height = 25
     max_prediction_depth = 200
@@ -54,10 +54,20 @@ if __name__ == "__main__":
     env_renderer = RenderTool(env)
     obs, _ = env.reset()
 
+    obs_list = []
+
+    obs_temp = copy.deepcopy(obs)
+    obs_list.append(obs_temp)
+
     for step in range(8 * (width + height + 20)):
 
         #obs = optimize_junc(observation_builder, obs)
-        obs = optimize(observation_builder, obs)
+        obs = optimize(observation_builder, obs, "edge")
+        obs = optimize(observation_builder, obs, "junction")
+
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+
         _action = get_action_dict_junc(observation_builder, obs)
 
         next_obs, all_rewards, done, _ = env.step(_action)
