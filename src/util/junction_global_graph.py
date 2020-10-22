@@ -33,6 +33,11 @@ class vertex:
         return 'Type : ' + str(self.Type) + '; Cost: ' + str(self.CostTotal) + '; Trains: ' + str(self.Trains)
 
 
+    def other_end(self, first):
+        return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]
+
+
+
     def setCosts(self):
         """
 

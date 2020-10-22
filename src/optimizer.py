@@ -153,7 +153,10 @@ def optimize(observation_builder, obs, node_type="edge"):
                 observations = copy.deepcopy(obs)
                 vertex = observations.vertices[vert]
 
-                collision_entry_point = vertex.Links[vertex.TrainsDir[id]][0]
+                if vertex.CostPerTrain[id] < 10000:
+                    continue
+
+                collision_entry_point = vertex.other_end(vertex.Links[vertex.TrainsDir[id]][0])
 
                 # find a cell in the trajectory which is not a two point link to clear the region.
                 #cell_seq_safe = find_non_link(observation_builder, observations, collision_entry_point, agent_id)
@@ -176,7 +179,7 @@ def optimize(observation_builder, obs, node_type="edge"):
                                           if item[0] == agent_cur_pos[0] and \
                                           item[1] == agent_cur_pos[1]][0]
 
-                if agent_cell_seq_current <= cell_seq_current:
+                if agent_cell_seq_current < cell_seq_current:
 
                     bitmap = np.zeros((len(observation_builder.env.agents),
                                        observation_builder.max_prediction_depth * 4),
@@ -201,7 +204,7 @@ def optimize(observation_builder, obs, node_type="edge"):
                     # we do not want a delay for the final edge if the number of matching cells in the trajectory is not just the final one
                     for number in range(vertex.TrainsTime[id][0],
                                         observation_builder.max_prediction_depth - (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1):
-                        if np.all(occupancy[number:number + (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1] == 0):
+                        if np.all(occupancy[number-1:number + (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1] == 0):
 
                             # update here
                             # if the edge is a junction
@@ -209,12 +212,20 @@ def optimize(observation_builder, obs, node_type="edge"):
                             # if not then delay on teh previous junction
 
                             # find previous
+                            if node_type != vertex.Type:
+                                print("Here")
 
                             if vertex.Type == "junction":
-                                vertex.TrainsTime[id] = [number, number + vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]]
-                                observations = observation_builder.update_for_delay(observations, agent_id)
+                                vertex.TrainsTime[id] = [number, number + 1]
+                                observations = observation_builder.update_for_delay(observations, agent_id, node_type)
                                 observations.setCosts()
                                 inner_observation_structure.append([observations.CostTotalEnv, observations])
+                            elif vertex.Type == "edge":
+                                vertex.TrainsTime[id] = [number, number + vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]]
+                                observations = observation_builder.update_for_delay(observations, agent_id, node_type)
+                                observations.setCosts()
+                                inner_observation_structure.append([observations.CostTotalEnv, observations])
+                            """
                             elif vertex.Type== "edge":
 
                                 connected_vertices = [item[1] for item in vertex.Links if agent_id in item[1].Trains]
@@ -233,6 +244,7 @@ def optimize(observation_builder, obs, node_type="edge"):
                                 observations = observation_builder.update_for_delay(observations, agent_id)
                                 observations.setCosts()
                                 inner_observation_structure.append([observations.CostTotalEnv, observations])
+                            """
 
                             break
 
@@ -244,6 +256,8 @@ def optimize(observation_builder, obs, node_type="edge"):
                 obs = sorted_cost_list[0][1]
             elif len(inner_observation_structure) == 1:
                 obs = inner_observation_structure[0][1]
+            else:
+                print("here")
         """
             #min_cost = []
             if len(inner_observation_structure) > 1:
@@ -459,7 +473,7 @@ def get_action_dict_junc(observation_builder, obs):
                 #target_vertex = obs.vertices[str(next_position)[1:-1]]
                 current_vertex = [obs.vertices[item] for item in obs.vertices if cur_position in obs.vertices[item].Cells][0]
                 target_vertex = [obs.vertices[item] for item in obs.vertices if next_position in obs.vertices[item].Cells][0]
-                print(target_vertex.Type)
+                #print(target_vertex.Type)
                 agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
                 target_edge_vertex = [item[1] for item in target_vertex.Links if a in item[1].Trains
                                       and item[1] != current_vertex]

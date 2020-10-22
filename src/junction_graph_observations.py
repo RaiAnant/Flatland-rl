@@ -205,7 +205,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         status = self.is_update_required(observations)
 
         if status:
-            self.observations = self.update_for_traffic(observations)
+            self.observations = self.update_for_delay(observations)
             self.observations.setCosts()
         """
 
@@ -706,9 +706,289 @@ class GraphObsForRailEnv(ObservationBuilder):
 
 
 
+    def update_for_delay_edge_only(self, observations, a, vert_type):
+        """
+        Inherited method used for pre computations.
+
+        :return:
+        """
+        agent_trajectory = self.cells_sequence[a]
+
+        agent = self.env.agents[a]
+        is_last_edge = False
+
+        current_edge = [observations.vertices[vertex] for vertex in observations.vertices \
+                            if agent.initial_position in observations.vertices[vertex].Cells][0]
+
+        # collect all junctions until next edge
+        #next_edge = None
+        next_vertex = current_edge
+
+        target_pos = agent_trajectory[-2]
+
+        while not is_last_edge:
 
 
-    def update_for_delay(self, observations, a):
+            #if target_pos in current_edge.Cells:
+            #    is_last_edge = True
+            #    continue
+
+            junc_list = []
+
+            while not is_last_edge:
+
+                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+
+                junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
+
+                next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
+
+                if next_vertex.Type != "junction":
+                    try:
+                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                    except:
+                        is_last_edge = True
+                        continue
+
+                    junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
+
+                    #next_edge = next_vertex
+                    break
+
+            if is_last_edge:
+                continue
+
+            #print(junc_list)
+            #print("----------")
+            #
+            next_list = []
+
+            if vert_type == "junction":
+                current_time_val = junc_list[::-1][1][1][1]
+
+                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+
+                for item in junc_list[::-1][1:-1]:
+
+                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    current_time_val -= 1
+
+                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
+            elif vert_type == "edge":
+                current_time_val = junc_list[::-1][0][1][0]
+
+                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+
+                for item in junc_list[::-1][1:-1]:
+
+                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    current_time_val -= 1
+
+                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
+
+            #print(next_list)
+            next_list = next_list[::-1]
+            #print(next_list)
+
+            #print("Here")
+
+            next_vertex = current_edge
+
+            filler_index = 0
+
+            while True:
+
+                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+
+                next_vertex.TrainsTime[agent_index] = next_list[filler_index][0]
+                filler_index += 1
+
+                next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
+
+                if next_vertex.Type != "junction":
+                    agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                    next_vertex.TrainsTime[agent_index] = next_list[filler_index][0]
+                    current_edge = next_vertex
+                    break
+
+        return observations
+
+
+
+
+    def update_for_delay(self, observations, a, vert_type):
+        """
+        Inherited method used for pre computations.
+
+        :return:
+        """
+        agent_trajectory = self.cells_sequence[a]
+
+        agent = self.env.agents[a]
+        is_last_edge = False
+
+        current_edge = [observations.vertices[vertex] for vertex in observations.vertices \
+                            if agent.initial_position in observations.vertices[vertex].Cells][0]
+
+        # collect all junctions until next edge
+        #next_edge = None
+        next_vertex = current_edge
+
+        target_pos = agent_trajectory[-2]
+
+        initial_lapse = 0
+
+        while not is_last_edge:
+
+
+            #if target_pos in current_edge.Cells:
+            #    is_last_edge = True
+            #    continue
+
+            junc_list = []
+
+            while not is_last_edge:
+
+                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+
+                junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
+
+                next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
+
+                if next_vertex.Type != "junction":
+                    try:
+                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                    except:
+                        is_last_edge = True
+                        continue
+
+                    junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
+
+                    #next_edge = next_vertex
+                    break
+
+            if is_last_edge:
+                continue
+
+            #print(junc_list)
+            #print("----------")
+            #
+            next_list = []
+
+            if initial_lapse != 0:
+                pass
+                #    print("here")
+            elif vert_type == "junction":
+                current_time_val = junc_list[::-1][1][1][1]
+
+                #if current_time_val > current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]:
+                #    print("here")
+                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+
+                for item in junc_list[::-1][1:-1]:
+
+                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    current_time_val -= 1
+
+                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
+
+                if junc_list[::-1][-1][1][0] > current_time_val:
+                    pass
+                    #print("Here")
+            elif vert_type == "edge":
+                current_time_val = junc_list[::-1][0][1][0]
+
+                #if current_time_val > current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]:
+                #    print("here")
+
+                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+
+                for item in junc_list[::-1][1:-1]:
+
+                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    current_time_val -= 1
+
+
+
+                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
+
+                #if junc_list[::-1][-1][1][0] > current_time_val:
+                #    print("here")
+
+            #print(next_list)
+
+            next_list = next_list[::-1]
+
+
+            #next_list_temp = [item[0] for item in next_list]
+
+            if initial_lapse == 0:
+                junc_list_temp = [item[1][1] - item[1][0] for item in junc_list]
+                next_list_temp = [item[0][1] - item[0][0] for item in next_list]
+                initial_lapse = abs(((np.sum(junc_list_temp)) - ((np.sum(next_list_temp)))))
+            #if initial_lapse > 0:
+            #    print("here")
+            #print(initial_lapse)
+
+            #next_list_temp = np.asarray(next_list_temp)
+            #next_list_temp = next_list_temp + initial_lapse
+
+            #print(vert_type)
+            #print(junc_list)
+            #print(next_list)
+
+            #print(next_list)
+
+            #print("Here")
+
+            next_vertex = current_edge
+
+            filler_index = 0
+
+            while True:
+                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+
+                if len(next_list):
+
+                    next_vertex.TrainsTime[agent_index][0] = next_list[filler_index][0][0]
+                    next_vertex.TrainsTime[agent_index][1] = next_list[filler_index][0][1]
+
+                    filler_index += 1
+
+                    #if next_vertex.Type != "junction":
+                    #if len(next_list):
+                    #    agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                    #    #next_vertex.TrainsTime[agent_index] = next_list[filler_index][0]
+                    #    next_vertex.TrainsTime[agent_index][0] = next_list[filler_index][0][0]
+                    #    next_vertex.TrainsTime[agent_index][1] = next_list[filler_index][0][1]
+
+                else:
+
+                    if filler_index > 0:
+                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                        # next_vertex.TrainsTime[agent_index] = next_list[filler_index][0]
+                        next_vertex.TrainsTime[agent_index][0] += initial_lapse
+                        next_vertex.TrainsTime[agent_index][1] += initial_lapse
+                        #print(next_vertex.TrainsTime[agent_index])
+
+
+                    filler_index += 1
+
+
+                if len(junc_list) == filler_index:
+                    current_edge = next_vertex
+                    break
+                else:
+                    next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
+
+        return observations
+
+
+
+
+
+
+    def update_for_delay_1(self, observations, a):
         """
         Inherited method used for pre computations.
 
@@ -738,17 +1018,22 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         # initial state
         start_timestamp = 0
-        agent_current_vertex = agent_initial_positions[a][1]
+        agent_first_edge = agent_initial_positions[a][1]
         agent_prev_vertex = None
         agent_trajectory = self.cells_sequence[a]
         agent_pos_on_traj = 0
         end_timestamp = 0
+
+
+
 
         # start with the beginning
         # find next exit on trajectory
         while(True):
 
             agent_next_vertex = None
+
+            # move all the delay to previous edge : No matter what
 
             # check what sort of vertex the agent is at right now.
             if agent_current_vertex.Type == "junction":
@@ -814,13 +1099,16 @@ class GraphObsForRailEnv(ObservationBuilder):
                     second_time = agent_next_vertex.TrainsTime[pos_on_second_edge]
 
                     if second_time[0] > first_time[1]:
-                        # a delay is probably added
+                        # a delay is probably added in the next node
+                        # propagate it back by
                         first_time[1] = second_time[0]
 
                     elif second_time[0] < first_time[1]:
                         shift = first_time[1] - second_time[0]
                         second_time[0] += shift
                         second_time[1] += shift
+                    else:
+                        print("here")
 
                 else:
                     break
