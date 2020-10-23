@@ -116,13 +116,10 @@ def optimize(observation_builder, obs, node_type="edge"):
 
     :return: List of observations containing resulting graph after each optimization step
     """
+    observation_builder.setDeadLocks(obs)
+    obs.setCosts()
 
     check_again_counter = 0
-
-    #outer_observation_structure = []
-    #observations = copy.deepcopy(obs)
-    #outer_observation_structure.append([obs.CostTotalEnv, observations])
-
 
     while check_again_counter < 20:
         # check if the cost is within limits
@@ -139,16 +136,29 @@ def optimize(observation_builder, obs, node_type="edge"):
         if not len(optimization_candidate):
             break
 
-        outer_observation_structure = []
         for vert in optimization_candidate:
 
             observations = copy.deepcopy(obs)
-
             trains = observations.vertices[vert].Trains
-
             inner_observation_structure = []
 
-            for id, agent_id in enumerate(trains):
+            candidate_trains = []
+
+            max_cost = np.max(observations.vertices[vert].CostPerTrain)
+
+            if max_cost >= 100000:
+                candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                    if observations.vertices[vert].CostPerTrain[id] >= 100000 ]
+
+            elif max_cost >= 10000:
+                candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                    if observations.vertices[vert].CostPerTrain[id] >= 10000 ]
+
+
+            for candidate in candidate_trains:
+
+                id = candidate[0]
+                agent_id = candidate[1]
 
                 observations = copy.deepcopy(obs)
                 vertex = observations.vertices[vert]
@@ -179,7 +189,7 @@ def optimize(observation_builder, obs, node_type="edge"):
                                           if item[0] == agent_cur_pos[0] and \
                                           item[1] == agent_cur_pos[1]][0]
 
-                if agent_cell_seq_current < cell_seq_current:
+                if agent_cell_seq_current <= cell_seq_current:
 
                     bitmap = np.zeros((len(observation_builder.env.agents),
                                        observation_builder.max_prediction_depth * 4),
@@ -198,18 +208,14 @@ def optimize(observation_builder, obs, node_type="edge"):
 
                     occupancy = np.sum(bitmap, axis=0)
 
-                    if vertex.TrainsTime[id][1] < observation_builder.ts:
-                        print("seems like the optimization cannot be done ahead in time")
+
+                    #if vertex.TrainsTime[id][1] < observation_builder.ts:
+                    #    print("seems like the optimization cannot be done ahead in time")
 
                     # we do not want a delay for the final edge if the number of matching cells in the trajectory is not just the final one
                     for number in range(vertex.TrainsTime[id][0],
                                         observation_builder.max_prediction_depth - (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1):
                         if np.all(occupancy[number-1:number + (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1] == 0):
-
-                            # update here
-                            # if the edge is a junction
-                            # delay here
-                            # if not then delay on teh previous junction
 
                             # find previous
                             if node_type != vertex.Type:
@@ -217,39 +223,17 @@ def optimize(observation_builder, obs, node_type="edge"):
 
                             if vertex.Type == "junction":
                                 vertex.TrainsTime[id] = [number, number + 1]
-                                observations = observation_builder.update_for_delay(observations, agent_id, node_type)
-                                observations.setCosts()
-                                inner_observation_structure.append([observations.CostTotalEnv, observations])
                             elif vertex.Type == "edge":
                                 vertex.TrainsTime[id] = [number, number + vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]]
-                                observations = observation_builder.update_for_delay(observations, agent_id, node_type)
-                                observations.setCosts()
-                                inner_observation_structure.append([observations.CostTotalEnv, observations])
-                            """
-                            elif vertex.Type== "edge":
 
-                                connected_vertices = [item[1] for item in vertex.Links if agent_id in item[1].Trains]
-
-                                for connected_vertex in connected_vertices:
-
-                                    id_on_connected_vertex = \
-                                    [num for num, item in enumerate(connected_vertex.Trains) if item == agent_id][0]
-
-                                    if connected_vertex.TrainsTime[id_on_connected_vertex][1] == vertex.TrainsTime[id][0]:
-
-                                        difference = number - vertex.TrainsTime[id][0]
-
-                                        connected_vertex.TrainsTime[id][0] += difference
-                                        connected_vertex.TrainsTime[id][1] += difference
-                                observations = observation_builder.update_for_delay(observations, agent_id)
-                                observations.setCosts()
-                                inner_observation_structure.append([observations.CostTotalEnv, observations])
-                            """
+                            observations = observation_builder.update_for_delay(observations, agent_id, node_type)
+                            observations.setCosts()
+                            inner_observation_structure.append([observations.CostTotalEnv, observations])
 
                             break
 
                 else:
-                    print("here")
+                    print("seems like the optimization cannot be done ahead in time")
 
             if len(inner_observation_structure) > 1:
                 sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)

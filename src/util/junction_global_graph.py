@@ -19,11 +19,15 @@ class vertex:
         self.Links = []
 
         self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
+        self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
 
         self.CostPerTrain = []
+        self.CostCollisionLockTotal = 0
+        self.CostDeadLockTotal = 0
 
         self.CostTotal = 0
 
+        self.update_ts = 0
 
     def __str__(self):
         """
@@ -46,79 +50,46 @@ class vertex:
 
         self.CostCollisionLockTotal = 0
         self.CostTransitionTimeTotal = 0
+        self.CostDeadLockTotal = 0
         self.CostTotal = 0
         self.CostPerTrain = []
 
         self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
 
-        if self.Type == "edge" or self.Type == "junction":
-            for agent_pos_id, agent_id in enumerate(self.Trains):
+        for agent_pos_id, agent_id in enumerate(self.Trains):
 
-                # find direction of first agent
-                agent_dir = self.TrainsDir[agent_pos_id]
+            # find direction of first agent
+            agent_dir = self.TrainsDir[agent_pos_id]
 
-                # find the agents which are not in teh same direction (can be many if junction)
-                opposing_agents = [num for num, item in enumerate(self.TrainsDir) if item != agent_dir]
-
-
-                if len(opposing_agents):
-                    for opp_agent in opposing_agents:
-
-                        bitmap = np.zeros((np.max(self.TrainsTime) + 1))
-                        bitmap[self.TrainsTime[opp_agent][0]:self.TrainsTime[opp_agent][1]+1] = 1
-
-                        if np.any(bitmap[self.TrainsTime[agent_pos_id][0]:self.TrainsTime[agent_pos_id][1]+1] > 0):
-                            self.CollisionLockMatrix[agent_pos_id][opp_agent] = 1
-
-                #i = self.TrainsTime
-
-                #for i, item in enumerate(self.TrainsTime):
+            # find the agents which are not in teh same direction (can be many if junction)
+            opposing_agents = [num for num, item in enumerate(self.TrainsDir) if item != agent_dir]
 
 
-
-                if self.TrainsTime[agent_pos_id][0] != 0:
-                    self.CostPerTrain.append(
-                        np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000 + abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
-                    self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 5000
-
-                else:
-                    self.CostPerTrain.append(abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
-
-                self.CostTransitionTimeTotal += abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
-
-            self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
-        else:
-            print("What kind of node is this ?")
-
-"""
-        if self.Type == "junction1":
-            for agent_pos_id, agent_id in enumerate(self.Trains):
-
-                # find direction of first agent
-                agent_dir = self.TrainsDir[agent_pos_id]
-
-                # find the agents which are not in teh same direction (can be many if junction)
-                opposing_agents = [num for num, item in enumerate(self.TrainsDir) if item != agent_dir]
-
+            if len(opposing_agents):
                 for opp_agent in opposing_agents:
-                    if self.TrainsTime[agent_pos_id][0] == self.TrainsTime[opp_agent][0]:
+
+                    bitmap = np.zeros((np.max(self.TrainsTime) + 1))
+                    bitmap[self.TrainsTime[opp_agent][0]:self.TrainsTime[opp_agent][1]+1] = 1
+
+                    if np.any(bitmap[self.TrainsTime[agent_pos_id][0]:self.TrainsTime[agent_pos_id][1]+1] > 0):
                         self.CollisionLockMatrix[agent_pos_id][opp_agent] = 1
 
-            for i, item in enumerate(self.TrainsTime):
+            if self.TrainsTime[agent_pos_id][0] != 0:
+                self.CostPerTrain.append(
+                            np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000
+                            + abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
+                            + np.count_nonzero(self.DeadLockMatrix[agent_id]) * 100000)
+                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 5000
+                self.CostDeadLockTotal += np.count_nonzero(self.DeadLockMatrix[agent_id]) * 50000
 
-                if item[0] != 0:
-                    self.CostPerTrain.append(
-                        np.count_nonzero(self.CollisionLockMatrix[i]) * 10000 + abs(item[1] +1 - item[0]))
-                    self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 5000
+            else:
+                self.CostPerTrain.append(abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
 
-                else:
-                    self.CostPerTrain.append(abs(item[1] + 1 - item[0]))
+            self.CostTransitionTimeTotal += abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
 
-                self.CostTransitionTimeTotal += abs(item[1] +1 - item[0])
+        self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal + self.CostDeadLockTotal
 
-            self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
 
-        el"""
 class Global_Graph:
     def __init__(self):
         """
