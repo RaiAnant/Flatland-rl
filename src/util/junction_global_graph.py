@@ -5,11 +5,12 @@ import numpy as np
 
 
 class vertex:
-    def __init__(self, type, node):
+    def __init__(self, type, node, id):
         """
 
         :param node:
         """
+        self.id = id
         self.Type = type
         self.Cells = node
 
@@ -34,8 +35,9 @@ class vertex:
 
         :return:
         """
-        return 'Type : ' + str(self.Type) + '; Cost: ' + str(self.CostTotal) + '; Trains: ' + str(self.Trains)
-
+        return 'Type : ' + str(self.Type) \
+               + '; Cost: ' + str(self.CostTotal) \
+               + '; Trains: ' + str(self.Trains)
 
     def other_end(self, first):
         return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]
@@ -96,6 +98,7 @@ class Global_Graph:
         """
         self.vertices = {}
         self.num_vertices = 0
+        self.Deadlocks = []
 
         self.CostTotalEnv = 0
 
@@ -104,7 +107,7 @@ class Global_Graph:
 
         :return:
         """
-        return 'Cost: ' + str(self.CostTotalEnv)
+        return 'Cost: ' + str(self.CostTotalEnv) + ' Deadlocks: ' + str(self.Deadlocks)
 
 
     def setCosts(self):
@@ -130,7 +133,7 @@ class Global_Graph:
         if str(cells[0])[1:-1]+","+str(cells[-1])[1:-1] not in self.vertices\
                 and str(cells[-1])[1:-1]+","+str(cells[0])[1:-1] not in self.vertices:
 
-            new_edge_vertex = vertex(type, cells)
+            new_edge_vertex = vertex(type, cells, str(cells[0])[1:-1]+","+str(cells[-1])[1:-1])
             self.vertices[str(cells[0])[1:-1]+","+str(cells[-1])[1:-1]] = new_edge_vertex
             self.num_vertices += 1
 
@@ -152,7 +155,7 @@ class Global_Graph:
         :return:
         """
         if str(node)[1:-1] not in self.vertices:
-            new_vertex = vertex(type, [node])
+            new_vertex = vertex(type, [node], str(node)[1:-1])
             self.vertices[str(node)[1:-1]] = new_vertex
             self.num_vertices = self.num_vertices + 1
             return new_vertex

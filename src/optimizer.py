@@ -454,81 +454,150 @@ def get_action_dict_junc(observation_builder, obs):
 
             if observation_builder.cur_pos_list[a][2]:
                 # check first if the agent is allowed to move to the junction
-                #target_vertex = obs.vertices[str(next_position)[1:-1]]
-                current_vertex = [obs.vertices[item] for item in obs.vertices if cur_position in obs.vertices[item].Cells][0]
-                target_vertex = [obs.vertices[item] for item in obs.vertices if next_position in obs.vertices[item].Cells][0]
-                #print(target_vertex.Type)
+                current_vertex = [obs.vertices[item]
+                                  for item in obs.vertices
+                                  if cur_position in obs.vertices[item].Cells][0]
+                target_vertex = [obs.vertices[item]
+                                 for item in obs.vertices
+                                 if next_position in obs.vertices[item].Cells][0]
                 agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
                 target_edge_vertex = [item[1] for item in target_vertex.Links if a in item[1].Trains
                                       and item[1] != current_vertex]
+
+                if not len(target_edge_vertex):
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+                    continue
+
+
+                #target_edge_vertex_key = [item[1].key() for item in target_vertex.Links if a in item[1].Trains
+                #                      and item[1] != current_vertex]
+
                 if len(target_edge_vertex):
-                    agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains) if
-                                                item == a]
+                    agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains)
+                                                    if item == a]
                     conflict_status = target_edge_vertex[0].CostPerTrain[agent_pos_target_edge_vertex[0]]
+                    max_conflict_status = max(target_edge_vertex[0].CostPerTrain)
                 else:
                     conflict_status = 0
+                    max_conflict_status = 0
+
+                if len(obs.Deadlocks):
+                    print("here")
+
+                """
+                own_deadlocks = [num for num,item in enumerate(obs.Deadlocks)
+                            if item[3][0] == next_position[0]
+                            and item[3][1] == next_position[1]
+                            and item[2] == target_edge_vertex[0].id
+                                 and item[0] == a]
+
+                others_deadlocks = [num for num,item in enumerate(obs.Deadlocks)
+                            if item[3][0] == next_position[0]
+                            and item[3][1] == next_position[1]
+                            and item[2] == target_edge_vertex[0].id
+                                    and item[1] == a]
+                """
+                own_deadlocks = [item for num,item in enumerate(obs.Deadlocks)
+                        if item[2] == target_edge_vertex[0].id
+                             and item[0] == a]
+
+                others_deadlocks = [num for num,item in enumerate(obs.Deadlocks)
+                            if item[2] == target_edge_vertex[0].id
+                                    and item[1] == a]
 
 
-                if conflict_status > 10000:
+                if len(obs.Deadlocks):
+                    deadlock_1 = [num for num, item in enumerate(obs.Deadlocks)
+                                  if item[2] == target_edge_vertex[0].id]
+                    if len(deadlock_1):
+                        print("Here")
+
+                if len(own_deadlocks) and max_conflict_status < 100000:
+
+                    for deadlock in own_deadlocks:
+                        obs.Deadlocks.remove(deadlock)
+
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+
+                elif len(own_deadlocks) and max_conflict_status > 100000:
+                    actions[a] = 4
+
+                elif len(others_deadlocks):
+
+                    found = False
+                    for deadlock in others_deadlocks:
+                        if obs.Deadlocks[deadlock][1] == a:
+                            actions = get_valid_action(observation_builder,
+                                                       a,
+                                                       cur_position,
+                                                       next_position,
+                                                       actions)
+                            found = True
+                            break
+
+                    if not found:
+                        actions[a] = 4
+
+                elif conflict_status > 10000 and conflict_status < 100000:
+
                     actions[a] = 4
 
                 elif observation_builder.ts+1 >= target_vertex.TrainsTime[agent_pos_id][0]:
-                    cur_direction = observation_builder.env.agents[a].direction
-                    if cur_position[0] == next_position[0]:
-                        if cur_position[1] > next_position[1]:
-                            next_direction = 3
-                        elif cur_position[1] < next_position[1]:
-                            next_direction = 1
-                        else:
-                            next_direction = cur_direction
-                    elif cur_position[1] == next_position[1]:
-                        if cur_position[0] > next_position[0]:
-                            next_direction = 0
-                        elif cur_position[0] < next_position[0]:
-                            next_direction = 2
-                        else:
-                            next_direction = cur_direction
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
 
-                    if (cur_direction + 1) % 4 == next_direction:
-                        actions[a] = 3
-                    elif (cur_direction - 1) % 4 == next_direction:
-                        actions[a] = 1
-                    elif next_direction == cur_direction:
-                        actions[a] = 2
-                    else:
-                        print("Bug")
                 else:
                     actions[a] = 4
+
             else:
-                cur_direction = observation_builder.env.agents[a].direction
-                if cur_position[0] == next_position[0]:
-                    if cur_position[1] > next_position[1]:
-                        next_direction = 3
-                    elif cur_position[1] < next_position[1]:
-                        next_direction = 1
-                    else:
-                        next_direction = cur_direction
-                elif cur_position[1] == next_position[1]:
-                    if cur_position[0] > next_position[0]:
-                        next_direction = 0
-                    elif cur_position[0] < next_position[0]:
-                        next_direction = 2
-                    else:
-                        next_direction = cur_direction
-                else:
-                    print(cur_position, next_position)
-
-                if (cur_direction + 1) % 4 == next_direction:
-                    actions[a] = 3
-                elif (cur_direction - 1) % 4 == next_direction:
-                    actions[a] = 1
-                elif next_direction == cur_direction:
-                    actions[a] = 2
-                else:
-                    print("Bug")
-
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
         else:
             actions[a] = 4
 
     return actions
 
+
+def get_valid_action(observation_builder, a, cur_position, next_position, actions):
+    cur_direction = observation_builder.env.agents[a].direction
+    if cur_position[0] == next_position[0]:
+        if cur_position[1] > next_position[1]:
+            next_direction = 3
+        elif cur_position[1] < next_position[1]:
+            next_direction = 1
+        else:
+            next_direction = cur_direction
+    elif cur_position[1] == next_position[1]:
+        if cur_position[0] > next_position[0]:
+            next_direction = 0
+        elif cur_position[0] < next_position[0]:
+            next_direction = 2
+        else:
+            next_direction = cur_direction
+    else:
+        print(cur_position, next_position)
+
+    if (cur_direction + 1) % 4 == next_direction:
+        actions[a] = 3
+    elif (cur_direction - 1) % 4 == next_direction:
+        actions[a] = 1
+    elif next_direction == cur_direction:
+        actions[a] = 2
+    else:
+        print("Bug")
+
+    return actions

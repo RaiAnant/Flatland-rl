@@ -528,97 +528,104 @@ class GraphObsForRailEnv(ObservationBuilder):
             for other_agent_id, other_trajectory in enumerate(agent_traj):
                 if agent_id != other_agent_id:
 
-                    # check first with second
+                    is_next_in_queue = [num for num,item in enumerate(agent_pos)
+                                           if item[0] == trajectory[1][0]
+                                           and item[1] == trajectory[1][1]]
+
+                    if len(is_next_in_queue) \
+                            and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
+                            and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\
+                            and self.env.agents[agent_id].position is not None:
+                        trajectory = trajectory[1:]
 
                     pos_first_in_second = [num for num,item in enumerate(trajectory)
-                                           if item[0] == other_trajectory[0][0]
-                                           and item[1] == other_trajectory[0][1]]
+                                          if item[0] == other_trajectory[0][0]
+                                          and item[1] == other_trajectory[0][1]]
 
                     if len(pos_first_in_second):
                         first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0]+1][::-1]
+
                         if len(first_agent_traj_from_overlap) > 1:
                             incre = 0
 
                             while True:
 
                                 if incre == len(other_trajectory):
-                                    #print("locked section but safe in time as the otehr agent has its trajectory ending before reaching the current agent")
                                     break
                                 elif incre == len(first_agent_traj_from_overlap):
+
                                     dead_lock_matrix[agent_id][other_agent_id] = 1
-
                                     first_agent_traj_from_overlap = first_agent_traj_from_overlap[::-1]
-                                    # find the edges where deadlock is happening
-                                    # set the cost of the other agents to be 100000
 
-                                    #reverse teh list of cells as it is already reversed from the agent
-                                    # it surely has a junction at the first place
-                                    # do not put the cost on junction but only edges
                                     pos_on_conflict_section = 0
-                                    for vertex in obs.vertices:
 
+                                    outer = True
+                                    while outer:
 
-                                        is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
-                                                            if first_agent_traj_from_overlap[pos_on_conflict_section][0]
-                                                            == item[0] and
-                                                            first_agent_traj_from_overlap[pos_on_conflict_section][1]
-                                                            == item[1]]
+                                        for vertex in obs.vertices:
 
-                                        if len(is_pos_on_vertex):
-                                            #print("Found")
-                                            if obs.vertices[vertex].Type == "edge":
-                                                if obs.vertices[vertex].update_ts < self.ts:
-                                                    obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                    obs.vertices[vertex].update_ts = self.ts
+                                            is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
+                                                                if first_agent_traj_from_overlap[pos_on_conflict_section][0]
+                                                                == item[0] and
+                                                                first_agent_traj_from_overlap[pos_on_conflict_section][1]
+                                                                == item[1]]
 
-                                                obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                            if len(is_pos_on_vertex):
+                                                if obs.vertices[vertex].Type == "edge":
+                                                    if obs.vertices[vertex].update_ts < self.ts:
+                                                        obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                        obs.vertices[vertex].update_ts = self.ts
 
-                                                exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
+                                                    obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
 
-                                                exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
-                                                                                    if item[0] == exit_point[0]
-                                                                                    and item[1] == exit_point[1]]
+                                                    exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
 
-                                                if len(exit_position_on_conflict_section):
-                                                    if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
-                                                        pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
+                                                    exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
+                                                                                        if item[0] == exit_point[0]
+                                                                                        and item[1] == exit_point[1]]
+
+                                                    if len(exit_position_on_conflict_section):
+                                                        if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
+                                                            pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
+                                                            if ([agent_id, other_agent_id, vertex, trajectory[pos_first_in_second[0]+1]]
+                                                                    not in obs.Deadlocks):
+                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex,
+                                                                                trajectory[pos_first_in_second[0]+1]])
+                                                            break
+                                                        else:
+
+                                                            print(" introduce deadlock ")
+                                                            if ([agent_id, other_agent_id, vertex, trajectory[pos_first_in_second[0]+1]]
+                                                                    not in obs.Deadlocks):
+                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex,
+                                                                                trajectory[pos_first_in_second[0]+1]])
+                                                            outer = False
+                                                            break
                                                     else:
+                                                        print("possibly wrong calculation in deadlock")
+                                                        outer = False
                                                         break
                                                 else:
-                                                    break
-                                            else:
 
-                                                if obs.vertices[vertex].update_ts < self.ts:
-                                                    obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                    obs.vertices[vertex].update_ts = self.ts
+                                                    if obs.vertices[vertex].update_ts < self.ts:
+                                                        obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                        obs.vertices[vertex].update_ts = self.ts
 
-                                                obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                                    obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
 
-                                                #exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
-
-                                                #exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
-                                                #                                    if item[0] == exit_point[0]
-                                                #                                    and item[1] == exit_point[1]]
-
-                                                if len(first_agent_traj_from_overlap) > \
-                                                        pos_on_conflict_section + 1:
-                                                    pos_on_conflict_section += 1
-                                                else:
-                                                    break
-
-
-                                    #print("sure deadlock")
+                                                    if len(first_agent_traj_from_overlap) > \
+                                                            pos_on_conflict_section + 1:
+                                                        pos_on_conflict_section += 1
+                                                        break
+                                                    else:
+                                                        outer = False
+                                                        break
                                     break
                                 elif not(first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
                                         and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][1]):
-                                    #print("Not a complete deadlock as section differ in the beginning as well as in the end")
                                     break
 
                                 incre += 1
-
-                            #print("LCS")
-        #print("checking here")
-
 
 
     def update_for_delay(self, observations, a, vert_type):

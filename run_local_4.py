@@ -28,7 +28,7 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 18
+    NUMBER_OF_AGENTS = 50
     width = 25
     height = 25
     max_prediction_depth = 200
@@ -56,9 +56,13 @@ if __name__ == "__main__":
 
     obs_list = []
 
+    conflict_data = []
+
     #obs_temp = copy.deepcopy(obs)
 
     for step in range(8 * (width + height + 20)):
+
+        obs.Deadlocks = conflict_data
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
@@ -68,6 +72,16 @@ if __name__ == "__main__":
         obs = optimize(observation_builder, obs, "junction")
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
+
+        conflict_data = obs.Deadlocks
+        """
+        obs = optimize(observation_builder, obs, "edge")
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+        obs = optimize(observation_builder, obs, "junction")
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+        """
 
         _action = get_action_dict_junc(observation_builder, obs)
 
