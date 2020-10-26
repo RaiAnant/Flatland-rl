@@ -28,7 +28,7 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 50
+    NUMBER_OF_AGENTS = 35
     width = 25
     height = 25
     max_prediction_depth = 200
@@ -62,16 +62,25 @@ if __name__ == "__main__":
 
     for step in range(8 * (width + height + 20)):
 
+        if step == 17:
+            print("here")
+
+        print("==================== ",step)
+
         obs.Deadlocks = conflict_data
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
-        obs = optimize(observation_builder, obs, "edge")
-        obs_temp = copy.deepcopy(obs)
+        observation_builder.setDeadLocks(obs)
+        obs.setCosts()
         obs_list.append(obs_temp)
-        obs = optimize(observation_builder, obs, "junction")
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
+
+        #obs = optimize(observation_builder, obs, "edge")
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
+        #obs = optimize(observation_builder, obs, "junction")
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
 
         conflict_data = obs.Deadlocks
         """
@@ -83,7 +92,11 @@ if __name__ == "__main__":
         obs_list.append(obs_temp)
         """
 
-        _action = get_action_dict_junc(observation_builder, obs)
+        _action, obs = get_action_dict_junc(observation_builder, obs)
+
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+
 
         next_obs, all_rewards, done, _ = env.step(_action)
 

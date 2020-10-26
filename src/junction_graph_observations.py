@@ -513,12 +513,12 @@ class GraphObsForRailEnv(ObservationBuilder):
         agent_pos = []
         agent_traj = []
         for a in self.env.agents:
-            agent_pos.append(a.position if a.position is not None
-                             else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED
-                             else a.target)
+            #agent_pos.append(a.position if a.position is not None
+            #                 else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED
+            #                 else a.target)
             agent_pos_on_traj = [num for num,item in enumerate(self.cells_sequence[a.handle])
-                                 if item[0] == agent_pos[a.handle][0]
-                                 and item[1] == agent_pos[a.handle][1]][0]
+                                 if item[0] == self.cur_pos_list[a.handle][0][0]
+                                 and item[1] == self.cur_pos_list[a.handle][0][1]][0]
             agent_traj.append(self.cells_sequence[a.handle][agent_pos_on_traj:])
 
 
@@ -528,15 +528,40 @@ class GraphObsForRailEnv(ObservationBuilder):
             for other_agent_id, other_trajectory in enumerate(agent_traj):
                 if agent_id != other_agent_id:
 
-                    is_next_in_queue = [num for num,item in enumerate(agent_pos)
-                                           if item[0] == trajectory[1][0]
-                                           and item[1] == trajectory[1][1]]
 
-                    if len(is_next_in_queue) \
-                            and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
-                            and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\
-                            and self.env.agents[agent_id].position is not None:
-                        trajectory = trajectory[1:]
+                    while True:
+
+                        if len(trajectory) > 3:
+                            is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
+                                                   if item[0][0] == trajectory[1][0]
+                                                   and item[0][1] == trajectory[1][1]]
+
+                            break_inner = False
+
+                            if len(is_next_in_queue):
+                                for deadlock in obs.Deadlocks:
+                                    if deadlock[0] == is_next_in_queue[0]:
+                                        if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
+                                                and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
+                                                and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
+                                                and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
+                                            trajectory = trajectory[1:]
+                                            break_inner = True
+                                            break
+
+                        else:
+                            break
+
+                        if not break_inner:
+                            break
+
+
+
+                    #if len(is_next_in_queue) \
+                    #        and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
+                    #        and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\
+                    #        and self.env.agents[agent_id].position is not None:
+                    #    trajectory = trajectory[1:]
 
                     pos_first_in_second = [num for num,item in enumerate(trajectory)
                                           if item[0] == other_trajectory[0][0]
@@ -585,24 +610,20 @@ class GraphObsForRailEnv(ObservationBuilder):
                                                                                         and item[1] == exit_point[1]]
 
                                                     if len(exit_position_on_conflict_section):
+
+                                                        if ([agent_id, other_agent_id, vertex]
+                                                                not in obs.Deadlocks):
+                                                            obs.Deadlocks.append([agent_id, other_agent_id, vertex])
+
                                                         if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
                                                             pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
-                                                            if ([agent_id, other_agent_id, vertex, trajectory[pos_first_in_second[0]+1]]
-                                                                    not in obs.Deadlocks):
-                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex,
-                                                                                trajectory[pos_first_in_second[0]+1]])
                                                             break
                                                         else:
-
-                                                            print(" introduce deadlock ")
-                                                            if ([agent_id, other_agent_id, vertex, trajectory[pos_first_in_second[0]+1]]
-                                                                    not in obs.Deadlocks):
-                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex,
-                                                                                trajectory[pos_first_in_second[0]+1]])
                                                             outer = False
                                                             break
                                                     else:
-                                                        print("possibly wrong calculation in deadlock")
+                                                        #print("possibly wrong calculation in deadlock")
+
                                                         outer = False
                                                         break
                                                 else:
