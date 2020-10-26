@@ -18,26 +18,24 @@ import copy
 from collections import defaultdict
 
 
-from src.graph_observations import GraphObsForRailEnv
+from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
-from src.optimizer import optimize, get_action_dict
-from itertools import groupby
+
+from src.optimizer import get_action_dict_junc, optimize
 
 import cv2
 
-#test_list = [1, 4, 4, 4, 5, 6, 7, 4, 3, 3, 9]
-#res = [[i, len(list(i_list))] for i, i_list in groupby(test_list)]
-#print(res)
+
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 7
-    width = 40
-    height = 40
+    NUMBER_OF_AGENTS = 35
+    width = 25
+    height = 25
     max_prediction_depth = 200
-    NUM_CITIES = 4
+    NUM_CITIES = 2
 
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
-                                           grid_mode=True,
+                                           grid_mode=False,
                                            max_rails_between_cities=2,
                                            max_rails_in_city=3,
                                            seed=1500)
@@ -56,10 +54,49 @@ if __name__ == "__main__":
     env_renderer = RenderTool(env)
     obs, _ = env.reset()
 
+    obs_list = []
+
+    conflict_data = []
+
+    #obs_temp = copy.deepcopy(obs)
+
     for step in range(8 * (width + height + 20)):
 
-        obs = optimize(observation_builder, obs)
-        _action = get_action_dict(observation_builder, obs)
+        if step == 17:
+            print("here")
+
+        print("==================== ",step)
+
+        obs.Deadlocks = conflict_data
+
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+        observation_builder.setDeadLocks(obs)
+        obs.setCosts()
+        obs_list.append(obs_temp)
+
+        #obs = optimize(observation_builder, obs, "edge")
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
+        #obs = optimize(observation_builder, obs, "junction")
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
+
+        conflict_data = obs.Deadlocks
+        """
+        obs = optimize(observation_builder, obs, "edge")
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+        obs = optimize(observation_builder, obs, "junction")
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+        """
+
+        _action, obs = get_action_dict_junc(observation_builder, obs)
+
+        obs_temp = copy.deepcopy(obs)
+        obs_list.append(obs_temp)
+
 
         next_obs, all_rewards, done, _ = env.step(_action)
 
@@ -72,7 +109,7 @@ if __name__ == "__main__":
                                       frames=True,
                                       return_image= True)
 
-        #cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
+        cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
 
         #time.sleep(1.0)
 
