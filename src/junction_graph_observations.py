@@ -528,33 +528,62 @@ class GraphObsForRailEnv(ObservationBuilder):
             for other_agent_id, other_trajectory in enumerate(agent_traj):
                 if agent_id != other_agent_id:
 
+                    if not self.cur_pos_list[agent_id][2] and len(trajectory) > 3:
+                        is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
+                                               if item[0][0] == trajectory[1][0]
+                                               and item[0][1] == trajectory[1][1]]
 
-                    while True:
+                        if len(is_next_in_queue):
+                            new_dead_locks = []
+                            for deadlock in obs.Deadlocks:
+                                if deadlock[0] == is_next_in_queue[0]:
+                                    if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
+                                            and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
+                                            and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
+                                            and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
 
-                        if len(trajectory) > 3:
-                            is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
-                                                   if item[0][0] == trajectory[1][0]
-                                                   and item[0][1] == trajectory[1][1]]
+                                        vertex_end_1 = obs.vertices[deadlock[2]].Cells[0]
+                                        vertex_end_2 = obs.vertices[deadlock[2]].Cells[-1]
 
-                            break_inner = False
+                                        end_pos = [num for num,item in enumerate(trajectory)
+                                                     if (item[0] == vertex_end_1[0]
+                                                     and item[1] == vertex_end_1[1])
+                                                     or (item[0] == vertex_end_2[0]
+                                                     and item[1] == vertex_end_2[1])]
 
-                            if len(is_next_in_queue):
-                                for deadlock in obs.Deadlocks:
-                                    if deadlock[0] == is_next_in_queue[0]:
-                                        if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
-                                                and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
-                                                and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
-                                                and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
-                                            trajectory = trajectory[1:]
-                                            break_inner = True
-                                            break
+                                        if len(end_pos):
+                                            new_dead_locks.append([agent_id, deadlock[1], deadlock[2]])
 
-                        else:
-                            break
+                            for deadlock in new_dead_locks:
+                                if deadlock not in obs.Deadlocks:
+                                    obs.Deadlocks.append(deadlock)
 
-                        if not break_inner:
-                            break
-
+                    # while True:
+                    #
+                    #     if len(trajectory) > 3:
+                    #         is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
+                    #                                if item[0][0] == trajectory[1][0]
+                    #                                and item[0][1] == trajectory[1][1]]
+                    #
+                    #         break_inner = False
+                    #
+                    #         if len(is_next_in_queue):
+                    #             for deadlock in obs.Deadlocks:
+                    #                 if deadlock[0] == is_next_in_queue[0]:
+                    #                     if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
+                    #                             and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
+                    #                             and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
+                    #                             and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
+                    #                         trajectory = trajectory[1:]
+                    #                         break_inner = True
+                    #                         break
+                    #
+                    #     else:
+                    #         break
+                    #
+                    #     if not break_inner:
+                    #         break
+                    #
 
 
                     #if len(is_next_in_queue) \
@@ -563,90 +592,105 @@ class GraphObsForRailEnv(ObservationBuilder):
                     #        and self.env.agents[agent_id].position is not None:
                     #    trajectory = trajectory[1:]
 
-                    pos_first_in_second = [num for num,item in enumerate(trajectory)
-                                          if item[0] == other_trajectory[0][0]
-                                          and item[1] == other_trajectory[0][1]]
+                    else:
 
-                    if len(pos_first_in_second):
-                        first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0]+1][::-1]
+                        pos_first_in_second = [num for num,item in enumerate(trajectory)
+                                              if item[0] == other_trajectory[0][0]
+                                              and item[1] == other_trajectory[0][1]]
 
-                        if len(first_agent_traj_from_overlap) > 1:
-                            incre = 0
+                        if len(pos_first_in_second):
+                            first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0]+1][::-1]
 
-                            while True:
+                            if len(first_agent_traj_from_overlap) > 1:
+                                incre = 0
 
-                                if incre == len(other_trajectory):
-                                    break
-                                elif incre == len(first_agent_traj_from_overlap):
+                                while True:
 
-                                    dead_lock_matrix[agent_id][other_agent_id] = 1
-                                    first_agent_traj_from_overlap = first_agent_traj_from_overlap[::-1]
+                                    # other agent ends before reaching current position of agent
+                                    # it would not have to cross teh agent
+                                    if incre == len(other_trajectory):
+                                        break
+                                    elif incre == len(first_agent_traj_from_overlap):
 
-                                    pos_on_conflict_section = 0
+                                        dead_lock_matrix[agent_id][other_agent_id] = 1
+                                        first_agent_traj_from_overlap = first_agent_traj_from_overlap[::-1]
 
-                                    outer = True
-                                    while outer:
+                                        pos_on_conflict_section = 0
 
-                                        for vertex in obs.vertices:
+                                        outer = True
+                                        while outer:
 
-                                            is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
-                                                                if first_agent_traj_from_overlap[pos_on_conflict_section][0]
-                                                                == item[0] and
-                                                                first_agent_traj_from_overlap[pos_on_conflict_section][1]
-                                                                == item[1]]
+                                            for vertex in obs.vertices:
 
-                                            if len(is_pos_on_vertex):
-                                                if obs.vertices[vertex].Type == "edge":
-                                                    if obs.vertices[vertex].update_ts < self.ts:
-                                                        obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                        obs.vertices[vertex].update_ts = self.ts
+                                                is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
+                                                                    if first_agent_traj_from_overlap[pos_on_conflict_section][0]
+                                                                    == item[0] and
+                                                                    first_agent_traj_from_overlap[pos_on_conflict_section][1]
+                                                                    == item[1]]
 
-                                                    obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                                if len(is_pos_on_vertex):
+                                                    if obs.vertices[vertex].Type == "edge":
+                                                        if obs.vertices[vertex].update_ts < self.ts:
+                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                            obs.vertices[vertex].update_ts = self.ts
 
-                                                    exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
+                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
 
-                                                    exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
-                                                                                        if item[0] == exit_point[0]
-                                                                                        and item[1] == exit_point[1]]
+                                                        exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
 
-                                                    if len(exit_position_on_conflict_section):
+                                                        exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
+                                                                                            if item[0] == exit_point[0]
+                                                                                            and item[1] == exit_point[1]]
 
-                                                        if ([agent_id, other_agent_id, vertex]
-                                                                not in obs.Deadlocks):
-                                                            obs.Deadlocks.append([agent_id, other_agent_id, vertex])
+                                                        if len(exit_position_on_conflict_section):
 
-                                                        if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
-                                                            pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
+                                                            if ([agent_id, other_agent_id, vertex]
+                                                                    not in obs.Deadlocks):
+                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex])
+
+                                                            if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
+                                                                pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
+                                                                break
+                                                            else:
+                                                                outer = False
+                                                                break
+                                                        else:
+                                                            #print("possibly wrong calculation in deadlock")
+
+                                                            outer = False
+                                                            break
+                                                    else:
+
+                                                        if obs.vertices[vertex].update_ts < self.ts:
+                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                            obs.vertices[vertex].update_ts = self.ts
+
+                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+
+                                                        if len(first_agent_traj_from_overlap) > \
+                                                                pos_on_conflict_section + 1:
+                                                            pos_on_conflict_section += 1
                                                             break
                                                         else:
                                                             outer = False
                                                             break
-                                                    else:
-                                                        #print("possibly wrong calculation in deadlock")
+                                        break
+                                    elif not(first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
+                                            and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][1]):
+                                        # this is the point of seperation
+                                        # might not be safe.
 
-                                                        outer = False
-                                                        break
-                                                else:
+                                        next_exit_point = other_trajectory[incre]
 
-                                                    if obs.vertices[vertex].update_ts < self.ts:
-                                                        obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                        obs.vertices[vertex].update_ts = self.ts
+                                        last_is_occupied = [num for num,item in enumerate(self.cur_pos_list)
+                                                            if item[0][0] == next_exit_point[0]
+                                                            and item[0][1] == next_exit_point[1]]
 
-                                                    obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                        if len(last_is_occupied):
+                                            dead_lock_matrix[agent_id][agent_id] = 1
+                                        break
 
-                                                    if len(first_agent_traj_from_overlap) > \
-                                                            pos_on_conflict_section + 1:
-                                                        pos_on_conflict_section += 1
-                                                        break
-                                                    else:
-                                                        outer = False
-                                                        break
-                                    break
-                                elif not(first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
-                                        and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][1]):
-                                    break
-
-                                incre += 1
+                                    incre += 1
 
 
     def update_for_delay(self, observations, a, vert_type):

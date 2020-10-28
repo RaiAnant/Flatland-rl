@@ -116,13 +116,21 @@ def optimize(observation_builder, obs, node_type="edge"):
 
     :return: List of observations containing resulting graph after each optimization step
     """
-    observation_builder.setDeadLocks(obs)
-    obs.setCosts()
+
+    #conflict_status =
+    #observation_builder.setDeadLocks(obs)
+    #obs.setCosts()
+
+    #conflict_status = obs.Deadlocks
+    #for
+
+    # deadlocks cannot be optimized and hence should be populated straightforward
+    # but the cost cannot change for the deadlocks even if they are resolved in the process
 
     max_CostTotalEnv = obs.CostTotalEnv
     check_again_counter = 0
 
-    while check_again_counter < 20:
+    while True:
         # check if the cost is within limits
 
         observations = copy.deepcopy(obs)
@@ -140,21 +148,38 @@ def optimize(observation_builder, obs, node_type="edge"):
         for vert in optimization_candidate:
 
             observations = copy.deepcopy(obs)
-            trains = observations.vertices[vert].Trains
+            #trains = observations.vertices[vert].Trains
             inner_observation_structure = []
 
             candidate_trains = []
 
-            max_cost = np.max(observations.vertices[vert].CostPerTrain)
+            #max_cost = np.max(observations.vertices[vert].CostPerTrain)
 
-            if max_cost >= 100000:
-                candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                    if observations.vertices[vert].CostPerTrain[id] >= 100000 ]
+            candidate_trains_1 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                if observations.vertices[vert].DeadlockCostPerTrain[id] > 0 ]
 
-            elif max_cost >= 10000:
-                candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                    if observations.vertices[vert].CostPerTrain[id] >= 10000 ]
 
+            candidate_trains_2 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                if observations.vertices[vert].CostPerTrain[id] > 10000]
+
+            if len(candidate_trains_1) and len(candidate_trains_2):
+                candidate_trains = candidate_trains_1 + candidate_trains_2
+            elif len(candidate_trains_1):
+                candidate_trains = candidate_trains_1
+            elif len(candidate_trains_2):
+                candidate_trains = candidate_trains_2
+
+            candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                if observations.vertices[vert].CostPerTrain[id] > 10000]
+
+
+            #elif max_cost >= 10000:
+            #    candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                        if observations.vertices[vert].CostPerTrain[id] >= 10000
+            #                        and observations.vertices[vert].DeadlockCostPerTrain[id] == 0]
+
+            #candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                        if 10000 < observations.vertices[vert].CostPerTrain[id] < 100000]
 
             for candidate in candidate_trains:
 
@@ -169,10 +194,7 @@ def optimize(observation_builder, obs, node_type="edge"):
 
                 collision_entry_point = vertex.other_end(vertex.Links[vertex.TrainsDir[id]][0])
 
-                # find a cell in the trajectory which is not a two point link to clear the region.
-                #cell_seq_safe = find_non_link(observation_builder, observations, collision_entry_point, agent_id)
-
-                # but also note the imeediate one
+                # but also note the immediate one
                 cell_seq_current = [num for num, item in
                                     enumerate(observation_builder.cells_sequence[agent_id])
                                     if item[0] == collision_entry_point[0]
@@ -209,18 +231,10 @@ def optimize(observation_builder, obs, node_type="edge"):
 
                     occupancy = np.sum(bitmap, axis=0)
 
-
-                    #if vertex.TrainsTime[id][1] < observation_builder.ts:
-                    #    print("seems like the optimization cannot be done ahead in time")
-
                     # we do not want a delay for the final edge if the number of matching cells in the trajectory is not just the final one
                     for number in range(vertex.TrainsTime[id][0],
                                         observation_builder.max_prediction_depth - (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1):
                         if np.all(occupancy[number-1:number + (vertex.TrainsTime[id][1] - vertex.TrainsTime[id][0]) + 1] == 0):
-
-                            # find previous
-                            #if node_type != vertex.Type:
-                            #    print("Here")
 
                             if vertex.Type == "junction":
                                 vertex.TrainsTime[id] = [number, number + 1]
@@ -233,22 +247,17 @@ def optimize(observation_builder, obs, node_type="edge"):
 
                             break
 
-                else:
-                    print("seems like the optimization cannot be done ahead in time")
-
             if len(inner_observation_structure) > 1:
                 sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
                 obs = sorted_cost_list[0][1]
             elif len(inner_observation_structure) == 1:
                 obs = inner_observation_structure[0][1]
-            #else:
-            #    print("here")
 
-
-            if obs.CostTotalEnv >= max_CostTotalEnv:
-                break
-            else:
-                max_CostTotalEnv = obs.CostTotalEnv
+        if obs.CostTotalEnv >= max_CostTotalEnv:
+            break
+        else:
+            print(max_CostTotalEnv, obs.CostTotalEnv)
+            max_CostTotalEnv = obs.CostTotalEnv
         """
             #min_cost = []
             if len(inner_observation_structure) > 1:
@@ -270,11 +279,6 @@ def optimize(observation_builder, obs, node_type="edge"):
         #outermost_observation_structure.append([sorted_cost_list[0][1]])
         #print("Here")
 
-        # select from the inner structure here the best one
-        # it can also be the old one
-        # what comes out of the vertex
-        #
-    # find the best of outer and send
     return obs
 
 
@@ -457,9 +461,21 @@ def get_action_dict_junc(observation_builder, obs):
         cur_position = observation_builder.cur_pos_list[a][0]
         next_position = observation_builder.cur_pos_list[a][1]
 
+        #if the next position is already occupied then no action
+
+        next_pos_occupied = [num for num,item in enumerate(observation_builder.cur_pos_list)
+                             if next_position[0] == item[0][0]
+                             and next_position[1] == item[0][1]
+                             and next_position[0] != observation_builder.env.agents[a].target[0]
+                             and next_position[1] != observation_builder.env.agents[a].target[1]]
+
+
         if next_position != tuple((0,0)):
 
-            if observation_builder.cur_pos_list[a][2]:
+            if len(next_pos_occupied):
+                actions[a] = 4
+
+            elif observation_builder.cur_pos_list[a][2]:
                 # check first if the agent is allowed to move to the junction
                 current_vertex = [obs.vertices[item]
                                   for item in obs.vertices
@@ -481,8 +497,10 @@ def get_action_dict_junc(observation_builder, obs):
 
                 agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains)
                                                 if item == a]
+
+                dead_conflict_status = target_edge_vertex[0].DeadlockCostPerTrain[agent_pos_target_edge_vertex[0]]
                 conflict_status = target_edge_vertex[0].CostPerTrain[agent_pos_target_edge_vertex[0]]
-                max_conflict_status = max(target_edge_vertex[0].CostPerTrain)
+                max_dead_conflict_status = max(target_edge_vertex[0].DeadlockCostPerTrain)
 
 
                 own_deadlocks = [item for num,item in enumerate(obs.Deadlocks)
@@ -496,15 +514,25 @@ def get_action_dict_junc(observation_builder, obs):
                 all_deadlocks = [num for num,item in enumerate(obs.Deadlocks)
                             if item[2] == target_edge_vertex[0].id]
 
-                #if len(obs.Deadlocks):
-                #    deadlock_1 = [num for num, item in enumerate(obs.Deadlocks)
-                #                  if item[2] == target_edge_vertex[0].id]
-                #    if len(deadlock_1):
-                #        print("Here")
 
+
+                # if theer are any deadlocks
+                # Solution depends upon them
                 if len(all_deadlocks):
 
-                    if len(others_deadlocks):
+                    if len(own_deadlocks) and dead_conflict_status < 100000:
+
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
+
+                    elif len(own_deadlocks) and max_dead_conflict_status > 100000:
+                        actions[a] = 4
+
+                    # if it is with some other agents
+                    elif len(others_deadlocks):
 
                         found = False
                         for deadlock in others_deadlocks:
@@ -520,24 +548,8 @@ def get_action_dict_junc(observation_builder, obs):
                         if not found:
                             actions[a] = 4
 
-
-                    elif len(own_deadlocks) and conflict_status < 100000:
-
-                        # first check if all the agents with its own set deadlock are gone
-
-                        #for deadlock in own_deadlocks:
-                        #    obs.Deadlocks.remove(deadlock)
-
-                        actions = get_valid_action(observation_builder,
-                                                   a,
-                                                   cur_position,
-                                                   next_position,
-                                                   actions)
-
-                    elif len(own_deadlocks) and max_conflict_status > 100000:
-                        actions[a] = 4
-
                     else:
+
                         actions[a] = 4
 
                 elif observation_builder.ts+1 >= target_vertex.TrainsTime[agent_pos_id][0]\
@@ -554,7 +566,8 @@ def get_action_dict_junc(observation_builder, obs):
                                                             a)
                 if actions[a] != 4 and len(own_deadlocks):
                     for deadlock in own_deadlocks:
-                        obs.Deadlocks.remove(deadlock)
+                        if deadlock in obs.Deadlocks:
+                            obs.Deadlocks.remove(deadlock)
 
             else:
                 actions = get_valid_action(observation_builder,
@@ -563,7 +576,9 @@ def get_action_dict_junc(observation_builder, obs):
                                            next_position,
                                            actions)
         else:
-            actions[a] = 4
+            if observation_builder.env.agents[a].status != RailAgentStatus.DONE_REMOVED:
+                actions[a] = 2
+
 
 
     for deadlock in obs.Deadlocks:
@@ -577,8 +592,10 @@ def get_action_dict_junc(observation_builder, obs):
 
 def optimize_and_find_action(actions, obs, observation_builder, a):
 
-    obs = optimize(observation_builder, obs, "edge")
-    obs = optimize(observation_builder, obs, "junction")
+    if obs.LastUpdated < observation_builder.ts:
+        obs = optimize(observation_builder, obs, "edge")
+        obs = optimize(observation_builder, obs, "junction")
+        obs.LastUpdated = observation_builder.ts
 
     cur_position = observation_builder.cur_pos_list[a][0]
     next_position = observation_builder.cur_pos_list[a][1]
