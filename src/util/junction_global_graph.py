@@ -23,6 +23,8 @@ class vertex:
         self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
 
         self.CostPerTrain = []
+        self.DeadlockCostPerTrain = []
+
         self.CostCollisionLockTotal = 0
         self.CostDeadLockTotal = 0
 
@@ -43,18 +45,7 @@ class vertex:
         return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]
 
 
-
-    def setCosts(self):
-        """
-
-        :return:
-        """
-
-        self.CostCollisionLockTotal = 0
-        self.CostTransitionTimeTotal = 0
-        self.CostDeadLockTotal = 0
-        self.CostTotal = 0
-        self.CostPerTrain = []
+    def setCollision(self):
 
         self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
 
@@ -76,16 +67,38 @@ class vertex:
                     if np.any(bitmap[self.TrainsTime[agent_pos_id][0]:self.TrainsTime[agent_pos_id][1]+1] > 0):
                         self.CollisionLockMatrix[agent_pos_id][opp_agent] = 1
 
+
+
+    def setCosts(self):
+        """
+
+        :return:
+        """
+
+        self.setCollision()
+
+        self.CostCollisionLockTotal = 0
+        self.CostTransitionTimeTotal = 0
+        self.CostDeadLockTotal = 0
+        self.CostTotal = 0
+        self.CostPerTrain = []
+        self.DeadlockCostPerTrain = []
+
+        for agent_pos_id, agent_id in enumerate(self.Trains):
+
             if self.TrainsTime[agent_pos_id][0] != 0:
                 self.CostPerTrain.append(
-                            np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000
-                            + abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
-                            + np.count_nonzero(self.DeadLockMatrix[agent_id]) * 100000)
+                            abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
+                            + np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000)
+
                 self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 5000
-                self.CostDeadLockTotal += np.count_nonzero(self.DeadLockMatrix[agent_id]) * 50000
 
             else:
                 self.CostPerTrain.append(abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
+
+
+            self.CostDeadLockTotal += np.count_nonzero(self.DeadLockMatrix[agent_id]) * 50000
+            self.DeadlockCostPerTrain.append(np.count_nonzero(self.DeadLockMatrix[agent_id]) * 100000)
 
             self.CostTransitionTimeTotal += abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
 
@@ -99,6 +112,7 @@ class Global_Graph:
         self.vertices = {}
         self.num_vertices = 0
         self.Deadlocks = []
+        self.LastUpdated = 0
 
         self.CostTotalEnv = 0
 
