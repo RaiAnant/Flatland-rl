@@ -28,7 +28,7 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 50
+    NUMBER_OF_AGENTS = 40
     width = 25
     height = 25
     max_prediction_depth = 200
@@ -71,15 +71,6 @@ if __name__ == "__main__":
         observation_builder.setDeadLocks(obs)
         obs.setCosts()
         obs_list.append(obs_temp)
-        #obs = optimize(observation_builder, obs, "edge")
-        #obs = optimize(observation_builder, obs, "junction")
-
-        #obs = optimize(observation_builder, obs, "edge")
-        #obs_temp = copy.deepcopy(obs)
-        #obs_list.append(obs_temp)
-        #obs = optimize(observation_builder, obs, "junction")
-        #obs_temp = copy.deepcopy(obs)
-        #obs_list.append(obs_temp)
 
         conflict_data = obs.Deadlocks
         """

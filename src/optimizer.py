@@ -151,40 +151,31 @@ def optimize(observation_builder, obs, node_type="edge"):
             #trains = observations.vertices[vert].Trains
             inner_observation_structure = []
 
-            candidate_trains = []
+            # candidate_trains = []
+            # candidate_trains_1 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                     if observations.vertices[vert].DeadlockCostPerTrain[id] > 0 ]
+            # candidate_trains_2 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                     if observations.vertices[vert].CostPerTrain[id] > 10000]
+            # if len(candidate_trains_1) and len(candidate_trains_2):
+            #     candidate_trains = candidate_trains_1 + candidate_trains_2
+            # elif len(candidate_trains_1):
+            #     candidate_trains = candidate_trains_1
+            # elif len(candidate_trains_2):
+            #     candidate_trains = candidate_trains_2
+
+            candidate_trains = [[id, agent_id]
+                                for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                if observations.vertices[vert].CostPerTrain[id] > 10000]
 
             #max_cost = np.max(observations.vertices[vert].CostPerTrain)
-
-            candidate_trains_1 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].DeadlockCostPerTrain[id] > 0 ]
-
-
-            candidate_trains_2 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].CostPerTrain[id] > 10000]
-
-            if len(candidate_trains_1) and len(candidate_trains_2):
-                candidate_trains = candidate_trains_1 + candidate_trains_2
-            elif len(candidate_trains_1):
-                candidate_trains = candidate_trains_1
-            elif len(candidate_trains_2):
-                candidate_trains = candidate_trains_2
-
-            candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].CostPerTrain[id] > 10000]
-
-
-            #elif max_cost >= 10000:
-            #    candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-            #                        if observations.vertices[vert].CostPerTrain[id] >= 10000
-            #                        and observations.vertices[vert].DeadlockCostPerTrain[id] == 0]
-
-            #candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-            #                        if 10000 < observations.vertices[vert].CostPerTrain[id] < 100000]
 
             for candidate in candidate_trains:
 
                 id = candidate[0]
                 agent_id = candidate[1]
+
+                #if observations.vertices[vert].CostPerTrain[id] != max_cost:
+                #    continue
 
                 observations = copy.deepcopy(obs)
                 vertex = observations.vertices[vert]
@@ -246,6 +237,10 @@ def optimize(observation_builder, obs, node_type="edge"):
                             inner_observation_structure.append([observations.CostTotalEnv, observations])
 
                             break
+
+
+                    #if observations.CostTotalEnv < obs.CostTotalEnv:
+                    #    obs = observations
 
             if len(inner_observation_structure) > 1:
                 sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
@@ -461,21 +456,20 @@ def get_action_dict_junc(observation_builder, obs):
         cur_position = observation_builder.cur_pos_list[a][0]
         next_position = observation_builder.cur_pos_list[a][1]
 
-        #if the next position is already occupied then no action
-
-        next_pos_occupied = [num for num,item in enumerate(observation_builder.cur_pos_list)
-                             if next_position[0] == item[0][0]
-                             and next_position[1] == item[0][1]
-                             and next_position[0] != observation_builder.env.agents[a].target[0]
-                             and next_position[1] != observation_builder.env.agents[a].target[1]]
-
-
         if next_position != tuple((0,0)):
+
+            # if the next position is already occupied then no action
+            next_pos_occupied = [num for num, item in enumerate(observation_builder.cur_pos_list)
+                                 if next_position[0] == item[0][0]
+                                 and next_position[1] == item[0][1]
+                                 and next_position[0] != observation_builder.env.agents[a].target[0]
+                                 and next_position[1] != observation_builder.env.agents[a].target[1]]
 
             if len(next_pos_occupied):
                 actions[a] = 4
 
             elif observation_builder.cur_pos_list[a][2]:
+
                 # check first if the agent is allowed to move to the junction
                 current_vertex = [obs.vertices[item]
                                   for item in obs.vertices
@@ -494,6 +488,31 @@ def get_action_dict_junc(observation_builder, obs):
                                                next_position,
                                                actions)
                     continue
+
+
+                # check if capacity on the next safe section
+                if not target_edge_vertex[0].is_safe:
+                    current_vertex = copy.deepcopy(target_vertex)
+                    target_safe_vertex = copy.deepcopy(target_edge_vertex)
+
+                    # next safe edge and if it is free
+                    while True:
+                        if not target_safe_vertex[0].is_safe:
+                            # find next
+                            temp = [item[1] for item in target_safe_vertex[0].Links if a in item[1].Trains
+                                              and item[1] != current_vertex]
+                            current_vertex = target_safe_vertex[0]
+                            target_safe_vertex = temp
+                        else:
+                            break
+                else:
+                    target_safe_vertex = copy.deepcopy(target_edge_vertex)
+
+                # if no capacity on next safe edge the send stop signal
+                if target_safe_vertex[0].capacity <= target_safe_vertex[0].occupancy:
+                    actions[a] = 4
+                    continue
+
 
                 agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains)
                                                 if item == a]

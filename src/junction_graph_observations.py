@@ -584,8 +584,6 @@ class GraphObsForRailEnv(ObservationBuilder):
                     #     if not break_inner:
                     #         break
                     #
-
-
                     #if len(is_next_in_queue) \
                     #        and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
                     #        and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\

@@ -32,6 +32,10 @@ class vertex:
 
         self.update_ts = 0
 
+        self.is_safe = None
+        self.occupancy = 0
+        self.capacity = len(node)
+
     def __str__(self):
         """
 
@@ -83,6 +87,7 @@ class vertex:
         self.CostTotal = 0
         self.CostPerTrain = []
         self.DeadlockCostPerTrain = []
+        self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
 
         for agent_pos_id, agent_id in enumerate(self.Trains):
 
