@@ -129,15 +129,15 @@ class Agent_Tree():
                 transitions = [(env.distance_map.get()[self.agent_no, get_new_position(pos, direction)[0], get_new_position(pos, direction)[1], direction], action, direction) for action, direction in actions]
                 transitions.sort(key = lambda x: x[0])  #sort the actions on the basis of their distance from final position
 
-                if node.node_id == (26,10):
-                    print('here')
 
                 for idx, params in enumerate(transitions):  #loop through all possible transitions
 
                     _, action, direction = params
 
+                    if pos[0] == 12 and pos[1]==5 and dir ==0:
+                        print("at the node for debug")
 
-                    if transitions[idx][0] - transitions[0][0] > 81:  # if the current transition leads to a cost 40 greater than the first transtion (with the least cost), avoid it
+                    if transitions[idx][0] - transitions[0][0] > 51:  # if the current transition leads to a cost 40 greater than the first transtion (with the least cost), avoid it
                         break
 
                     new_node = Node(pos, [])  #node for the new transition
@@ -146,16 +146,14 @@ class Agent_Tree():
                     new_direction = find_new_direction(dir, action) #new direction of the agnet after taking the transition
 
                     if (pos[0], pos[1], dir, action) in self.node_maps:  #to see if the node for the given route already exists
-                        if self.node_maps[(pos[0], pos[1], dir, action)] is not None:
-                            node.add_child(self.node_maps[(pos[0], pos[1], dir, action)])  #if the node for the given route already exists, add the node as a child
-                            notLoop = True #there is no loop
+                        node.add_child(self.node_maps[(pos[0], pos[1], dir, action)])  #if the node for the given route already exists, add the node as a child
+                        notLoop = True #there is no loop
 
                     elif self.build_tree(obs, env, new_position, new_direction, new_node, hash, i + 1):  #calulate the path from the node and see if it exists
                         self.node_maps[(pos[0], pos[1], dir, action)] = new_node  #add the new node the the map
                         node.add_child(new_node) #add the node as child
                         notLoop = True
-                    else:
-                        self.node_maps[(pos[0], pos[1], dir, action)] = None
+
 
                 del hash[(pos[0], pos[1], dir)]
 

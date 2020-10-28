@@ -15,11 +15,14 @@ import r2_solver
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.observations import TreeObsForRailEnv
 import copy
+from collections import defaultdict
 
 from src.util.tree_builder import Agent_Tree
 
 from src.graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
+from src.optimizer import optimize, get_action_dict
+from itertools import groupby
 
 import cv2
 
@@ -84,10 +87,10 @@ def naive_solver(env, obs):
 
 def reroute_solver(cell_sequence, actions, env, agent_idx):
     for k in actions.keys():
-        if 0 < actions[k] and actions[k] < 4 and env.agents[k].position and agent_idx[k] < len(cell_sequence[k]):
+        if 0 < actions[k] < 4 and env.agents[k].position and agent_idx[k]+1 < len(cell_sequence[k]):
             for idx, direction in enumerate([(env.agents[k].direction + i) % 4 for i in range(-1, 2)]):
                 new_position = get_new_position(env.agents[k].position, direction)
-                if new_position == cell_sequence[k][int(agent_idx[k])]:
+                if new_position == cell_sequence[k][int(agent_idx[k])+1]:
                     actions[k] = idx + 1
                     # agent_idx[k]+=1
                     break
@@ -95,16 +98,31 @@ def reroute_solver(cell_sequence, actions, env, agent_idx):
 
 
 if __name__ == "__main__":
+    # TODO : Note there is an error for the given enviornment which needs to be resolved
+    # NUMBER_OF_AGENTS = 7
+    # width = 40
+    # height = 40
+    # max_prediction_depth = 100
+    # NUM_CITIES = 4
+
+    # TODO : collision not detected for the given case
     NUMBER_OF_AGENTS = 8
-    width = 40
+    width = 36
     height = 35
     max_prediction_depth = 80
+    NUM_CITIES = 4
 
-    rail_generator = sparse_rail_generator(max_num_cities=5,
+    # NUMBER_OF_AGENTS = 8
+    # width = 30
+    # height = 30
+    # max_prediction_depth = 80
+    # NUM_CITIES = 4
+
+    rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
                                            grid_mode=False,
                                            max_rails_between_cities=2,
                                            max_rails_in_city=3,
-                                           seed=1)
+                                           seed=1500)
 
     observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=max_prediction_depth),
                                              bfs_depth=200)
@@ -131,6 +149,7 @@ if __name__ == "__main__":
 
     tree_dict = {}
     agent_idx = {}
+
     for idx, agent in enumerate(env.agents):
         tree = Agent_Tree(idx, agent.initial_position)
         tree.build_tree(obs, env)
@@ -151,8 +170,8 @@ if __name__ == "__main__":
                                 show_observations=True,
                                 frames=True,
                                 return_image=True)
-        time.sleep(1.0)
-
+    #     time.sleep(1.0)
+    #
     cell_sequence = observation_builder.cells_sequence.copy()  # getting the final routes of the agents
 
     for step in range(8 * (width + height + 20)):
@@ -191,7 +210,7 @@ if __name__ == "__main__":
 
         cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
 
-        time.sleep(1.0)
+        # time.sleep(1.0)
 
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:
