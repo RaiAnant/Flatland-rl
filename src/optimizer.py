@@ -383,62 +383,116 @@ def get_action_dict(observation_builder, observations):
     return actions
 
 
-    """
-    candidate_edges = [edge for edge in observations.edge_ids if len(edge.Trains) > 0]
-    for edge in candidate_edges:
-        for a in next_pos:
-            if a in edge.Trains:
-                if next_pos[a][0] in edge.Cells and next_pos[a][1] in edge.Cells:
+def agent_clipping(observation_builder):
 
+    priority = defaultdict()
+    clipped_agents = defaultdict(list)
 
+    for num, item in enumerate(observation_builder.cur_pos_list):
+        clipped_agents[num] = []
+        priority[num] = 0
 
-    candidate_edges = [edge for edge in observations.edge_ids if len(edge.Trains) > 0]
-    for edge in candidate_edges:
-        for a in next_pos:
-            if a in edge.Trains:
-                if next_pos[a][0] in edge.Cells and next_pos[a][1] in edge.Cells:
+        for num_other, item_other in enumerate(observation_builder.cur_pos_list):
+            if num != num_other:
+                # check if they have teh same conflict and opening,
+                # and they are unit distance apart
+                # clip them together
+                if item[3] == item_other[3] and len(item[3])\
+                        and pow((item[0][0]-item_other[0][0]), 2)\
+                        + pow((item[0][1]-item_other[0][1]), 2) < 2:
+                    priority[num] += 1
+                    clipped_agents[num].append(num_other)
 
-                    cur_position = next_pos[a][0]
-                    next_position = next_pos[a][1]
+    return priority, clipped_agents
 
-                    #id = [num for num, item in enumerate(edge.Trains) if item == a][0]
+def get_action_dict_safety(observation_builder, obs):
 
-                    # now either the train is leaving
-                    if (next_pos[a][1] == edge.Cells[0] or next_pos[a][1] == edge.Cells[-1]) and observation_builder.ts <= edge.TrainsTime[id][1]+2:
-                        actions[a] = 4
-                    # or it is entering or normally travelling
-                    else:
+    actions = defaultdict()
 
-                        cur_direction = observation_builder.env.agents[a].direction
-                        if cur_position[0] == next_position[0]:
-                            if cur_position[1] > next_position[1]:
-                                next_direction = 3
-                            elif cur_position[1] < next_position[1]:
-                                next_direction = 1
-                            else:
-                                next_direction = cur_direction
-                        elif cur_position[1] == next_position[1]:
-                            if cur_position[0] > next_position[0]:
-                                next_direction = 0
-                            elif cur_position[0] < next_position[0]:
-                                next_direction = 2
-                            else:
-                                next_direction = cur_direction
+    priority, clipped_agents = agent_clipping(observation_builder)
 
-                        if (cur_direction + 1) % 4 == next_direction:
-                            actions[a] = 3
-                        elif (cur_direction - 1) % 4 == next_direction:
-                            actions[a] = 1
-                        elif next_direction == cur_direction:
-                            actions[a] = 2
-                        else:
-                            print("Bug")
+    have_path_unblocked = []
+    for a, row in enumerate(observation_builder.cur_pos_list):
+        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
 
-    print(actions)
+            # first check if competing with any agent at the first vertex
+            # if yes
+            # check its priority
+            # if more than the current agent then stop
+            # else check if any agent is already at this edge
+
+            if observation_builder.cur_pos_list[a][4]:
+                blocked = False
+                outer = True
+                for vertex in observation_builder.cur_pos_list[a][3]:
+                    if not outer:
+                        break
+
+                    if len(vertex.currently_residing_agents):
+                        for agents in vertex.currently_residing_agents:
+                            try:
+                                if vertex.TrainsTraversal[agents][1] == vertex.TrainsTraversal[a][0]:
+                                    blocked = True
+                                    outer = False
+                                    break
+                            except:
+                                print("here")
+
+                    for num, agents_data in enumerate(observation_builder.cur_pos_list):
+                        if len(agents_data[3]):
+                            if agents_data[3][0] == vertex:
+                                if priority[num] > priority[a]:
+                                    blocked = True
+                                    outer = False
+                                    break
+
+                #
+                if not blocked:
+                    cur_position = observation_builder.cur_pos_list[a][0]
+                    next_position = observation_builder.cur_pos_list[a][1]
+
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+
+                    for item in clipped_agents[a]:
+                        actions = get_valid_action(observation_builder,
+                                               item,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+                else:
+                    actions[a] = 4
+                    for item in clipped_agents[a]:
+                        actions[item] = 4
+            else:
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
+
+    for a, row in enumerate(observation_builder.cur_pos_list):
+        cur_position = observation_builder.cur_pos_list[a][0]
+        next_position = observation_builder.cur_pos_list[a][1]
+
+        if not observation_builder.cur_pos_list[a][2]:
+            if observation_builder.cur_pos_list[a][0][0] != 0 or \
+                    observation_builder.cur_pos_list[a][0][1] != 0:
+
+                if observation_builder.cur_pos_list[a][1][0] != 0 or \
+                     observation_builder.cur_pos_list[a][1][1] != 0:
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+                else:
+                    actions[a] = 2
+
     return actions
-
-"""
-
 
 
 def get_action_dict_junc(observation_builder, obs):

@@ -21,14 +21,14 @@ from collections import defaultdict
 from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
-from src.optimizer import get_action_dict_junc, optimize
+from src.optimizer import get_action_dict_safety, optimize
 
 import cv2
 
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 40
+    NUMBER_OF_AGENTS = 50
     width = 25
     height = 25
     max_prediction_depth = 200
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     obs_list = []
 
-    conflict_data = []
+    #conflict_data = []
 
     #obs_temp = copy.deepcopy(obs)
 
@@ -64,15 +64,15 @@ if __name__ == "__main__":
 
         print("==================== ",step)
 
-        obs.Deadlocks = conflict_data
+        #obs.Deadlocks = conflict_data
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
-        observation_builder.setDeadLocks(obs)
-        obs.setCosts()
-        obs_list.append(obs_temp)
+        #observation_builder.setDeadLocks(obs)
+        #obs.setCosts()
+        #obs_list.append(obs_temp)
 
-        conflict_data = obs.Deadlocks
+        #conflict_data = obs.Deadlocks
         """
         obs = optimize(observation_builder, obs, "edge")
         obs_temp = copy.deepcopy(obs)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         obs_list.append(obs_temp)
         """
 
-        _action, obs = get_action_dict_junc(observation_builder, obs)
+        _action = get_action_dict_safety(observation_builder, obs)
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)

@@ -1,7 +1,7 @@
 
 """ ###################### EDGE ####################"""
 import numpy as np
-
+from collections import defaultdict
 
 
 class vertex:
@@ -18,6 +18,8 @@ class vertex:
         self.TrainsTime = []
         self.TrainsDir = []  # 0 = A->B, 1 = B->A
         self.Links = []
+        self.TrainsTraversal = defaultdict(list)
+
 
         self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
         self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
@@ -32,7 +34,10 @@ class vertex:
 
         self.update_ts = 0
 
-        self.is_safe = None
+        self.currently_residing_agents = []
+
+
+        self.is_safe = True
         self.occupancy = 0
         self.capacity = len(node)
 
@@ -42,8 +47,9 @@ class vertex:
         :return:
         """
         return 'Type : ' + str(self.Type) \
-               + '; Cost: ' + str(self.CostTotal) \
-               + '; Trains: ' + str(self.Trains)
+                + '; Cost: ' + str(self.CostTotal) \
+                + '; Trains: ' + str(self.Trains) \
+                + '; Safety Status: ' + str(self.is_safe)
 
     def other_end(self, first):
         return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]

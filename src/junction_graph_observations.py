@@ -83,7 +83,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.observations = None
 
 
-    def is_update_required(self,observations):
+    def set_agents_state(self):
         """
 
         :param observations:
@@ -96,34 +96,78 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         self.cur_pos_list = []
 
-        Status = False
         for a in self.env.agents:
             localStatus = False
             cur_pos = a.position if a.position is not None else a.initial_position \
                            if a.status != RailAgentStatus.DONE_REMOVED \
-                           else a.target
-            try:
+                           else tuple((0,0))
+            if cur_pos[0] == 0 and cur_pos[1] == 0:
+                self.cur_pos_list.append([cur_pos, cur_pos, False, [], True])
+            else:
                 cur_pos_on_traj = [num for num,cell in enumerate(self.cells_sequence[a.handle])
-                               if np.all(cell == cur_pos)][0]
-            except:
-                print(cur_pos, self.cells_sequence[a.handle])
-            next_pos_on_traj = cur_pos_on_traj + 1
-            next_pos = self.cells_sequence[a.handle][next_pos_on_traj]
+                           if cell[0] == cur_pos[0] and cell[1] == cur_pos[1]][0]
 
-            for signals in observations.vertices:
-                if next_pos == observations.vertices[signals].Cells[0] \
-                        and observations.vertices[signals].Type == "junction":
-                    Status = True
-                    localStatus = True
+                next_pos_on_traj = cur_pos_on_traj + 1
+                next_pos = self.cells_sequence[a.handle][next_pos_on_traj]
 
-            self.cur_pos_list.append([cur_pos, next_pos, localStatus])
+                if next_pos[0] == 0 and next_pos[1] == 0:
+                    self.cur_pos_list.append([cur_pos, next_pos, False, [], True])
+                else:
+
+                    for signals in self.observations.vertices:
+
+                        if cur_pos in self.observations.vertices[signals].Cells:
+                            cur_vertex = self.observations.vertices[signals]
+
+                        if next_pos in self.observations.vertices[signals].Cells:
+                            next_vertex = self.observations.vertices[signals]
+
+
+                    if a.handle not in cur_vertex.currently_residing_agents:
+                        cur_vertex.currently_residing_agents.append(a.handle)
+
+                    if cur_vertex == next_vertex and cur_vertex != None and next_vertex != None:
+
+                        # Need this info to check potential clipping
+                        # although it doesn't need an action
+                        vert_list = []
+
+                        if next_vertex.TrainsTraversal[a.handle][1] != None:
+                            next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+
+                            while next_vertex != None:
+                                if next_vertex.is_safe:
+                                    vert_list.append(next_vertex)
+                                    break
+                                else:
+                                    vert_list.append(next_vertex)
+                                    next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+                        else:
+                            vert_list.append(next_vertex)
+
+                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, True])
+
+                    else:
+
+                        # Need this info to check potential clipping
+                        # although it doesn't need an action
+
+                        vert_list = []
+
+                        initial_safe_switch = False if cur_vertex.is_safe else True
+
+                        while True:
+                            if next_vertex.is_safe:
+                                vert_list.append(next_vertex)
+                                break
+                            else:
+                                vert_list.append(next_vertex)
+                                next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+
+                        self.cur_pos_list.append([cur_pos, next_pos, initial_safe_switch, vert_list, initial_safe_switch])
 
 
 
-        if self.ts == 0:
-            return True
-
-        return Status
 
 
     def _find_forks(self):
@@ -194,12 +238,9 @@ class GraphObsForRailEnv(ObservationBuilder):
                 self.agent_position_data[a.handle].append(current_position)
 
         observations = copy.deepcopy(self.base_graph)
-        status = self.is_update_required(observations)
-
-        if status:
-            self.observations = self.populate_graph(observations)
-            self.observations.setCosts()
-
+        self.observations = self.populate_graph(observations)
+        self.observations.setCosts()
+        self.set_agents_state()
 
         return self.observations
 
@@ -266,7 +307,17 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
                         agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
 
+                        if agent_next_position == None and agent_prev_vertex == None:
+                            print("here")
+
+                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
+
                     else:
+                        if agent_next_position == None and agent_prev_vertex == None:
+                            print("here")
+
+                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
+
                         break
 
 
@@ -290,6 +341,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
                         agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
 
+                        if agent_next_position == None and agent_prev_vertex == None:
+                            print("here")
+
+                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
+
                     elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj+1:]:
 
                         agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
@@ -308,8 +364,18 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
                         agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
 
+                        if agent_next_position == None and agent_prev_vertex == None:
+                            print("here")
+
+                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
+
                     elif agent_trajectory[-2] in agent_current_vertex.Cells:
                         #print("Trajectory End")
+                        if agent_next_position == None and agent_prev_vertex == None:
+                            print("here")
+
+                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
+
                         break
 
                 start_timestamp = end_timestamp
@@ -317,10 +383,8 @@ class GraphObsForRailEnv(ObservationBuilder):
                 agent_current_vertex = agent_next_vertex
                 agent_pos_on_traj = agent_next_pos_on_traj
 
+
         return observations
-
-
-
 
 
     # For Global Graph
@@ -361,6 +425,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                         vertex.Links.append([junctions, self.base_graph.vertices[str(path[0])[1:-1]]])
                         self.base_graph.vertices[str(path[0])[1:-1]].Links.append([path[0],vertex])
+
 
     def _step_extend(self, current, direction):
         """
@@ -420,6 +485,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                     return temp, traj+temp1
             else:
                 return [position, total_transitions], traj
+
 
     def _step(self, current):
         """
