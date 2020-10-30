@@ -403,15 +403,84 @@ def agent_clipping(observation_builder):
                     priority[num] += 1
                     clipped_agents[num].append(num_other)
 
+    # final_priority = defaultdict()
+    # final_clipped_agents = defaultdict(list)
+    #
+    # for num, item in enumerate(observation_builder.cur_pos_list):
+    #     if item[2]:
+    #         final_priority[num] = priority[num]
+    #         final_clipped_agents[num] = clipped_agents[num]
+    #
+    # for waiting_agent in final_clipped_agents:
+    #     if len(final_clipped_agents[waiting_agent]):
+    #         print("here")
+
+
+
+
+
     return priority, clipped_agents
 
 def get_action_dict_safety(observation_builder, obs):
 
     actions = defaultdict()
 
-    priority, clipped_agents = agent_clipping(observation_builder)
+    blocked_edges = []
 
-    have_path_unblocked = []
+    # those which are not changing zones
+    # if travelling in safe zone; get action
+    # if not get action and set blockages
+    for a, row in enumerate(observation_builder.cur_pos_list):
+        if not observation_builder.cur_pos_list[a][2] and a not in actions.keys():
+
+            cur_position = observation_builder.cur_pos_list[a][0]
+            next_position = observation_builder.cur_pos_list[a][1]
+
+            actions = get_valid_action(observation_builder,
+                                       a,
+                                       cur_position,
+                                       next_position,
+                                       actions)
+
+            if observation_builder.cur_pos_list[a][4]:
+                for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                    blocked_edges.append(edge)
+
+
+
+    # those agents which enter unsafe zone from another unsafe zone
+    for a, row in enumerate(observation_builder.cur_pos_list):
+        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
+
+            blocked = False
+            for transit_edge in observation_builder.cur_pos_list[a][3]:
+
+                if transit_edge in blocked_edges:
+                    blocked = True
+                    break
+
+            if blocked:
+                actions[a] = 4
+                continue
+            else:
+                cur_position = observation_builder.cur_pos_list[a][0]
+                next_position = observation_builder.cur_pos_list[a][1]
+
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
+
+                for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                    blocked_edges.append(edge)
+
+
+    print("Here")
+
+    """
+    #priority, clipped_agents = agent_clipping(observation_builder)
+    #have_path_unblocked = []
     for a, row in enumerate(observation_builder.cur_pos_list):
         if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
 
@@ -421,7 +490,16 @@ def get_action_dict_safety(observation_builder, obs):
             # if more than the current agent then stop
             # else check if any agent is already at this edge
 
+            # if the agent
+            # has already entered blocked section
             if observation_builder.cur_pos_list[a][4]:
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
+
+            else:
                 blocked = False
                 outer = True
                 for vertex in observation_builder.cur_pos_list[a][3]:
@@ -467,23 +545,18 @@ def get_action_dict_safety(observation_builder, obs):
                     actions[a] = 4
                     for item in clipped_agents[a]:
                         actions[item] = 4
-            else:
-                actions = get_valid_action(observation_builder,
-                                           a,
-                                           cur_position,
-                                           next_position,
-                                           actions)
+    """
 
+    # for all other agents
     for a, row in enumerate(observation_builder.cur_pos_list):
-        cur_position = observation_builder.cur_pos_list[a][0]
-        next_position = observation_builder.cur_pos_list[a][1]
+        if a not in actions.keys():
+            cur_position = observation_builder.cur_pos_list[a][0]
+            next_position = observation_builder.cur_pos_list[a][1]
 
-        if not observation_builder.cur_pos_list[a][2]:
-            if observation_builder.cur_pos_list[a][0][0] != 0 or \
-                    observation_builder.cur_pos_list[a][0][1] != 0:
+            if cur_position[0] != 0 or cur_position[1] != 0:
 
-                if observation_builder.cur_pos_list[a][1][0] != 0 or \
-                     observation_builder.cur_pos_list[a][1][1] != 0:
+                if next_position[0] != 0 or next_position[1] != 0:
+
                     actions = get_valid_action(observation_builder,
                                                a,
                                                cur_position,

@@ -93,7 +93,14 @@ class vertex:
         self.CostTotal = 0
         self.CostPerTrain = []
         self.DeadlockCostPerTrain = []
-        self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
+
+
+        start_times = [item[0] for item in self.TrainsTime]
+
+        if np.max(start_times) == 0:
+            self.is_safe = True
+        else:
+            self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
 
         for agent_pos_id, agent_id in enumerate(self.Trains):
 

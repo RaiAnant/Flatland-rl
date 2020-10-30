@@ -28,7 +28,7 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 50
+    NUMBER_OF_AGENTS = 100
     width = 25
     height = 25
     max_prediction_depth = 200

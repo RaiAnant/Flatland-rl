@@ -132,6 +132,8 @@ class GraphObsForRailEnv(ObservationBuilder):
                         # although it doesn't need an action
                         vert_list = []
 
+                        initial_safe_switch = False if cur_vertex.is_safe else True
+
                         if next_vertex.TrainsTraversal[a.handle][1] != None:
                             next_vertex = next_vertex.TrainsTraversal[a.handle][1]
 
@@ -145,7 +147,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         else:
                             vert_list.append(next_vertex)
 
-                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, True])
+                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, initial_safe_switch])
 
                     else:
 
@@ -155,6 +157,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         vert_list = []
 
                         initial_safe_switch = False if cur_vertex.is_safe else True
+                        next_safe_switch = False if next_vertex.is_safe else True
 
                         while True:
                             if next_vertex.is_safe:
@@ -164,7 +167,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                                 vert_list.append(next_vertex)
                                 next_vertex = next_vertex.TrainsTraversal[a.handle][1]
 
-                        self.cur_pos_list.append([cur_pos, next_pos, initial_safe_switch, vert_list, initial_safe_switch])
+                        if initial_safe_switch:
+                            self.cur_pos_list.append([cur_pos, next_pos, not next_safe_switch, vert_list, initial_safe_switch])
+                        else:
+                            self.cur_pos_list.append([cur_pos, next_pos, next_safe_switch, vert_list, initial_safe_switch])
 
 
 
