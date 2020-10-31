@@ -32,11 +32,19 @@ if __name__ == "__main__":
     width = 25
     height = 25
     max_prediction_depth = 200
-    NUM_CITIES = 2
+    NUM_CITIES = 3
+
+    # problem
+    # NUMBER_OF_AGENTS = 100
+    # width = 25
+    # height = 25
+    # max_prediction_depth = 200
+    # NUM_CITIES = 3
+
 
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
                                            grid_mode=False,
-                                           max_rails_between_cities=2,
+                                           max_rails_between_cities=3,
                                            max_rails_in_city=3,
                                            seed=1500)
 
@@ -60,7 +68,7 @@ if __name__ == "__main__":
 
     #obs_temp = copy.deepcopy(obs)
 
-    for step in range(8 * (width + height + 20)):
+    for step in range(20 * (width + height + 20)):
 
         print("==================== ",step)
 

@@ -427,6 +427,32 @@ def get_action_dict_safety(observation_builder, obs):
 
     blocked_edges = []
 
+
+    # allow actions based on junctions data
+    for a, row in enumerate(observation_builder.cur_pos_list):
+        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
+            if observation_builder.cur_pos_list[a][3][0].id in observation_builder.signal_time.keys():
+                if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
+                    if observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] \
+                            == observation_builder.cur_pos_list[a][3]:
+                        if observation_builder.cur_pos_list[a][3][-1].capacity - \
+                                observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                            cur_position = observation_builder.cur_pos_list[a][0]
+                            next_position = observation_builder.cur_pos_list[a][1]
+
+                            actions = get_valid_action(observation_builder,
+                                                       a,
+                                                       cur_position,
+                                                       next_position,
+                                                       actions)
+
+                            if observation_builder.cur_pos_list[a][4]:
+                                observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                # set claim on exit cell
+                                for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                                    blocked_edges.append(edge)
+
+
     # those which are not changing zones
     # if travelling in safe zone; get action
     # if not get action and set blockages
@@ -443,40 +469,58 @@ def get_action_dict_safety(observation_builder, obs):
                                        actions)
 
             if observation_builder.cur_pos_list[a][4]:
-                for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                    blocked_edges.append(edge)
+                if len(observation_builder.cur_pos_list[a][3]):
+                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                    # set claim on exit cell
+                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                        blocked_edges.append(edge)
 
 
 
-    # those agents which enter unsafe zone from another unsafe zone
     for a, row in enumerate(observation_builder.cur_pos_list):
         if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
 
-            blocked = False
-            for transit_edge in observation_builder.cur_pos_list[a][3]:
+            if observation_builder.cur_pos_list[a][3][-1].capacity - \
+                    observation_builder.cur_pos_list[a][3][-1].occupancy>0\
+                    or observation_builder.cur_pos_list[a][3][0].is_safe:
+                blocked = False
+                for transit_edge in observation_builder.cur_pos_list[a][3]:
 
-                if transit_edge in blocked_edges:
-                    blocked = True
-                    break
+                    if transit_edge in blocked_edges:
+                        blocked = True
+                        break
 
-            if blocked:
-                actions[a] = 4
-                continue
+                if blocked:
+                    actions[a] = 4
+                    continue
+                else:
+                    cur_position = observation_builder.cur_pos_list[a][0]
+                    next_position = observation_builder.cur_pos_list[a][1]
+
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+
+                    # because the agent is allowed
+                    # it should set occupancy on the exit cell
+                    #observation_builder.occupancy[observation_builder.cur_pos_list[a][3][-1].id] += 1
+                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                    # it should also set on the junction,
+                    # the list of vertices which are blocked for this agent
+                    observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                    #observation_builder.cur_pos_list[a][3][0].signal_deadlocks.append(observation_builder.cur_pos_list[a][3])
+                    # and the number of timesteps it should wait and
+                    # see if another agent is going in the same direction
+                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = 3
+                    #observation_builder.cur_pos_list[a][3][0].signal_time = 3
+
+
+                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                        blocked_edges.append(edge)
             else:
-                cur_position = observation_builder.cur_pos_list[a][0]
-                next_position = observation_builder.cur_pos_list[a][1]
-
-                actions = get_valid_action(observation_builder,
-                                           a,
-                                           cur_position,
-                                           next_position,
-                                           actions)
-
-                for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                    blocked_edges.append(edge)
-
-
-    print("Here")
+                actions[a] = 4
 
     """
     #priority, clipped_agents = agent_clipping(observation_builder)
@@ -548,22 +592,22 @@ def get_action_dict_safety(observation_builder, obs):
     """
 
     # for all other agents
-    for a, row in enumerate(observation_builder.cur_pos_list):
-        if a not in actions.keys():
-            cur_position = observation_builder.cur_pos_list[a][0]
-            next_position = observation_builder.cur_pos_list[a][1]
-
-            if cur_position[0] != 0 or cur_position[1] != 0:
-
-                if next_position[0] != 0 or next_position[1] != 0:
-
-                    actions = get_valid_action(observation_builder,
-                                               a,
-                                               cur_position,
-                                               next_position,
-                                               actions)
-                else:
-                    actions[a] = 2
+    # for a, row in enumerate(observation_builder.cur_pos_list):
+    #     if a not in actions.keys():
+    #         cur_position = observation_builder.cur_pos_list[a][0]
+    #         next_position = observation_builder.cur_pos_list[a][1]
+    #
+    #         if cur_position[0] != 0 or cur_position[1] != 0:
+    #
+    #             if next_position[0] != 0 or next_position[1] != 0:
+    #
+    #                 actions = get_valid_action(observation_builder,
+    #                                            a,
+    #                                            cur_position,
+    #                                            next_position,
+    #                                            actions)
+    #             else:
+    #                 actions[a] = 2
 
     return actions
 

@@ -58,6 +58,9 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.agent_position_data = defaultdict(list)
         self.agent_initial_positions = defaultdict(list)
         self.agent_init_edge_list = []
+        self.cur_pos_list = []
+        self.signal_time = defaultdict()
+        self.signal_deadlocks = defaultdict(list)
 
 
     def set_env(self, env: Environment):
@@ -118,6 +121,8 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                         if cur_pos in self.observations.vertices[signals].Cells:
                             cur_vertex = self.observations.vertices[signals]
+                            if cur_vertex != None:
+                                cur_vertex.occupancy += 1
 
                         if next_pos in self.observations.vertices[signals].Cells:
                             next_vertex = self.observations.vertices[signals]
@@ -281,6 +286,7 @@ class GraphObsForRailEnv(ObservationBuilder):
             # initial state
             start_timestamp = 0
             agent_current_vertex = agent_initial_positions[a][1]
+            #agent_current_vertex.occupancy += 1
             agent_prev_vertex = None
             agent_trajectory = self.cells_sequence[a]
             agent_pos_on_traj = 0
@@ -299,7 +305,8 @@ class GraphObsForRailEnv(ObservationBuilder):
                     agent_next_pos_on_traj = agent_pos_on_traj+1
 
 
-                    if (agent_current_vertex.Type == "edge" and agent_current_vertex.Cells[0] != agent_trajectory[-2])\
+                    if (agent_current_vertex.Type == "edge" \
+                            and agent_current_vertex.Cells[0] != agent_trajectory[-2])\
                             or agent_current_vertex.Type == "junction":
 
                         agent_next_vertex, agent_next_dir = \
