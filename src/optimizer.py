@@ -427,30 +427,39 @@ def get_action_dict_safety(observation_builder, obs):
 
     blocked_edges = []
 
+    for item in observation_builder.signal_time:
+        if observation_builder.signal_time[item] > 0:
+            observation_builder.signal_time[item] -= 1
 
     # allow actions based on junctions data
     for a, row in enumerate(observation_builder.cur_pos_list):
         if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
             if observation_builder.cur_pos_list[a][3][0].id in observation_builder.signal_time.keys():
                 if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
-                    if observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] \
-                            == observation_builder.cur_pos_list[a][3]:
-                        if observation_builder.cur_pos_list[a][3][-1].capacity - \
-                                observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
-                            cur_position = observation_builder.cur_pos_list[a][0]
-                            next_position = observation_builder.cur_pos_list[a][1]
 
-                            actions = get_valid_action(observation_builder,
-                                                       a,
-                                                       cur_position,
-                                                       next_position,
-                                                       actions)
+                    if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
+                            == len(observation_builder.cur_pos_list[a][3]):
+                        equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
+                                        zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
+                                            observation_builder.cur_pos_list[a][3])]
 
-                            if observation_builder.cur_pos_list[a][4]:
-                                observation_builder.cur_pos_list[a][3][-1].occupancy += 1
-                                # set claim on exit cell
-                                for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                                    blocked_edges.append(edge)
+                        if not np.count_nonzero(equal_status):
+                            if observation_builder.cur_pos_list[a][3][-1].capacity - \
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                                cur_position = observation_builder.cur_pos_list[a][0]
+                                next_position = observation_builder.cur_pos_list[a][1]
+
+                                actions = get_valid_action(observation_builder,
+                                                           a,
+                                                           cur_position,
+                                                           next_position,
+                                                           actions)
+
+                                if observation_builder.cur_pos_list[a][4]:
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                    # set claim on exit cell
+                                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                                        blocked_edges.append(edge)
 
 
     # those which are not changing zones
@@ -513,7 +522,7 @@ def get_action_dict_safety(observation_builder, obs):
                     #observation_builder.cur_pos_list[a][3][0].signal_deadlocks.append(observation_builder.cur_pos_list[a][3])
                     # and the number of timesteps it should wait and
                     # see if another agent is going in the same direction
-                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = 3
+                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = 5
                     #observation_builder.cur_pos_list[a][3][0].signal_time = 3
 
 
