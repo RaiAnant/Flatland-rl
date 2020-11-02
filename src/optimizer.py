@@ -421,15 +421,12 @@ def agent_clipping(observation_builder):
 
     return priority, clipped_agents
 
-def get_action_dict_safety(observation_builder, obs):
+def get_action_dict_safety(observation_builder, signal_timer):
 
     actions = defaultdict()
 
     blocked_edges = []
 
-    for item in observation_builder.signal_time:
-        if observation_builder.signal_time[item] > 0:
-            observation_builder.signal_time[item] -= 1
 
     # allow actions based on junctions data
     for a, row in enumerate(observation_builder.cur_pos_list):
@@ -460,6 +457,11 @@ def get_action_dict_safety(observation_builder, obs):
                                     # set claim on exit cell
                                     for edge in observation_builder.cur_pos_list[a][3][:-1]:
                                         blocked_edges.append(edge)
+
+
+    for item in observation_builder.signal_time:
+        if observation_builder.signal_time[item] > 0:
+            observation_builder.signal_time[item] -= 1
 
 
     # those which are not changing zones
@@ -522,7 +524,7 @@ def get_action_dict_safety(observation_builder, obs):
                     #observation_builder.cur_pos_list[a][3][0].signal_deadlocks.append(observation_builder.cur_pos_list[a][3])
                     # and the number of timesteps it should wait and
                     # see if another agent is going in the same direction
-                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = 5
+                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
                     #observation_builder.cur_pos_list[a][3][0].signal_time = 3
 
 

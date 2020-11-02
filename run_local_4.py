@@ -28,12 +28,12 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 100
+    NUMBER_OF_AGENTS = 40
     width = 25
     height = 25
     max_prediction_depth = 200
-    NUM_CITIES = 3
-
+    NUM_CITIES = 2
+    SIGNAL_TIMER = 5
     # problem
     # NUMBER_OF_AGENTS = 100
     # width = 25
@@ -90,7 +90,7 @@ if __name__ == "__main__":
         obs_list.append(obs_temp)
         """
 
-        _action = get_action_dict_safety(observation_builder, obs)
+        _action = get_action_dict_safety(observation_builder, SIGNAL_TIMER)
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
