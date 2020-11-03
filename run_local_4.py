@@ -3,7 +3,7 @@ import time
 from flatland.envs.rail_generators import complex_rail_generator
 
 from flatland.envs.schedule_generators import complex_schedule_generator
-from flatland.envs.rail_env import RailEnv
+from src.util.custom_rail_env  import RailEnv
 from flatland.utils.rendertools import RenderTool
 from flatland.envs.observations import GlobalObsForRailEnv
 from flatland.envs.malfunction_generators import malfunction_from_params
