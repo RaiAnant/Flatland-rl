@@ -28,11 +28,11 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 100
+    NUMBER_OF_AGENTS = 120
     width = 25
     height = 25
     max_prediction_depth = 200
-    NUM_CITIES = 2
+    NUM_CITIES = 3
     SIGNAL_TIMER = 4
     # problem
     # NUMBER_OF_AGENTS = 100

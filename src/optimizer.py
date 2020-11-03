@@ -473,18 +473,39 @@ def get_action_dict_safety(observation_builder, signal_timer):
                     if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
 
                         # if their deadlock zone have same length
+                        # if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
+                        #         == len(observation_builder.cur_pos_list[a][3]):
+                        #     equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
+                        #                     zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
+                        #                         observation_builder.cur_pos_list[a][3])]
+                        #
+                        #     # if they are all the same in the same order
+                        #     if not np.count_nonzero(equal_status):
+                        # if their deadlock zone have same length
                         if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
-                                == len(observation_builder.cur_pos_list[a][3]):
-                            equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
-                                            zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
-                                                observation_builder.cur_pos_list[a][3])]
+                                and len(observation_builder.cur_pos_list[a][3]):
+
+                            num = 0
+                            blocked = False
+                            while True:
+                                if observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id][num].id != \
+                                        observation_builder.cur_pos_list[a][3][num].id:
+                                    blocked = True
+                                    break
+
+                                num += 1
+                                if num >= len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id])-1\
+                                        or num >= len(observation_builder.cur_pos_list[a][3])-1:
+                                    break
 
                             # if they are all the same in the same order
-                            if not np.count_nonzero(equal_status):
+                            if not blocked:
 
                                 # if the capacity of exit vertex is not already full
+                                # or it is a target vertex
                                 if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
-                                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0 or \
+                                        observation_builder.cur_pos_list[a][3][-1].TrainsTraversal[a][1] == None:
                                     cur_position = observation_builder.cur_pos_list[a][0]
                                     next_position = observation_builder.cur_pos_list[a][1]
 
