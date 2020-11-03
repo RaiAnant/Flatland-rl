@@ -98,6 +98,7 @@ def reroute_solver(cell_sequence, actions, env, agent_idx):
 
 
 if __name__ == "__main__":
+
     # TODO : Note there is an error for the given enviornment which needs to be resolved
     # NUMBER_OF_AGENTS = 7
     # width = 40
@@ -119,7 +120,7 @@ if __name__ == "__main__":
     # NUM_CITIES = 4
 
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
-                                           grid_mode=False,
+                                           grid_mode=True,
                                            max_rails_between_cities=2,
                                            max_rails_in_city=3,
                                            seed=1500)
@@ -176,22 +177,27 @@ if __name__ == "__main__":
 
     for step in range(8 * (width + height + 20)):
 
-        _action = naive_solver(env, obs)
+# <<<<<<< HEAD
+#         _action = naive_solver(env, obs)
+#
+#         _action = reroute_solver(cell_sequence, _action, env,
+#                                  agent_idx)  # checking the action against new routs to update accordingly
+#
+#         for k in _action.keys():
+#
+#             if env.agents[k].status == 1:
+#                 # env.dev_pred_dict[k] = cell_sequence[k][agent_idx[k]:]
+#                 agent_idx[k] += env.agents[k].speed_data['speed']
+#             if env.agents[k].position is None:
+#                 continue
+#
+#             pos = (env.agents[k].position[0], env.agents[k].position[1], env.agents[k].direction)
+#             if _action[k] != 0 and pos in env.dev_pred_dict[k]:
+#                 env.dev_pred_dict[k].remove(pos)
+# =======
+        obs = optimize(observation_builder, obs)
+        _action = get_action_dict(observation_builder, obs)
 
-        _action = reroute_solver(cell_sequence, _action, env,
-                                 agent_idx)  # checking the action against new routs to update accordingly
-
-        for k in _action.keys():
-
-            if env.agents[k].status == 1:
-                # env.dev_pred_dict[k] = cell_sequence[k][agent_idx[k]:]
-                agent_idx[k] += env.agents[k].speed_data['speed']
-            if env.agents[k].position is None:
-                continue
-
-            pos = (env.agents[k].position[0], env.agents[k].position[1], env.agents[k].direction)
-            if _action[k] != 0 and pos in env.dev_pred_dict[k]:
-                env.dev_pred_dict[k].remove(pos)
 
         next_obs, all_rewards, done, _ = env.step(_action)
 
@@ -208,7 +214,9 @@ if __name__ == "__main__":
                                       frames=True,
                                       return_image=True)
 
-        cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
+
+        #cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
+
 
         # time.sleep(1.0)
 

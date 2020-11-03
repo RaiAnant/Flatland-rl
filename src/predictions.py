@@ -154,7 +154,7 @@ class ShortestPathPredictorForRailEnv(PredictionBuilder):
                     cells_sequence[a.handle].append(a.target)
                     break
                 elif step[4] != RailEnvActions.STOP_MOVING:
-                    cell_pos = (step[1], step[2])  # Takes (yi, xi)
+                    cell_pos = (int(step[1]), int(step[2]))  # Takes (yi, xi)
                     cells_sequence[a.handle].append(cell_pos)
 
 
