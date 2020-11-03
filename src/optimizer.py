@@ -489,7 +489,10 @@ def get_action_dict_junc(observation_builder, obs):
                 target_vertex = [obs.vertices[item]
                                  for item in obs.vertices
                                  if next_position in obs.vertices[item].Cells][0]
-                agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
+                try:
+                    agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
+                except IndexError:
+                    print("Debug")
                 target_edge_vertex = [item[1] for item in target_vertex.Links if a in item[1].Trains
                                       and item[1] != current_vertex]
 

@@ -32,17 +32,23 @@ if __name__ == "__main__":
     # max_prediction_depth = 200
     # NUM_CITIES = 3
 
-    NUMBER_OF_AGENTS = 10
-    width = 31
-    height = 31
-    max_prediction_depth = 200
-    NUM_CITIES = 4
+    # NUMBER_OF_AGENTS = 10
+    # width = 31
+    # height = 31
+    # max_prediction_depth = 200
+    # NUM_CITIES = 4
 
     # NUMBER_OF_AGENTS = 13
     # width = 46
     # height = 31
     # max_prediction_depth = 200
     # NUM_CITIES = 5
+
+    NUMBER_OF_AGENTS = 100
+    width = 35
+    height = 35
+    max_prediction_depth = 200
+    NUM_CITIES = 4
 
     find_alternate_paths = True
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
@@ -107,7 +113,9 @@ if __name__ == "__main__":
             observation_builder.cells_sequence[idx].append(agent.target)
             observation_builder.cells_sequence[idx].append((0, 0))
 
-        obs = observation_builder.get()
+        observation_builder.observations = observation_builder.populate_graph(copy.deepcopy(observation_builder.base_graph))
+        observation_builder.observations.setCosts()
+        obs = observation_builder.observations
 
     for step in range(8 * (width + height + 20)):
 

@@ -29,10 +29,10 @@ from flatland.core.grid.grid4_utils import get_new_position
 from flatland.core.grid.grid_utils import coordinate_to_position, distance_on_rail, position_to_coordinate
 from flatland.utils.ordered_set import OrderedSet
 
-
 from src.priority import assign_priority
 from src.util.graph import Graph
 from src.util.junction_global_graph import Global_Graph
+
 
 class GraphObsForRailEnv(ObservationBuilder):
     """
@@ -46,7 +46,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.max_prediction_depth = 0
         self.prediction_dict = {}  # Dict handle : list of tuples representing prediction steps
         self.predicted_pos = {}  # Dict ts : int_pos_list
-        self.predicted_pos_list = {} # Dict handle : int_pos_list
+        self.predicted_pos_list = {}  # Dict handle : int_pos_list
         self.predicted_pos_coord = {}  # Dict ts : coord_pos_list
         self.predicted_dir = {}  # Dict ts : dir (float)
         self.num_active_agents = 0
@@ -59,13 +59,11 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.agent_initial_positions = defaultdict(list)
         self.agent_init_edge_list = []
 
-
     def set_env(self, env: Environment):
         super().set_env(env)
         if self.predictor:
             # Use set_env available in PredictionBuilder (parent class)
             self.predictor.set_env(self.env)
-
 
     def reset(self):
         """
@@ -82,8 +80,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.base_graph = None
         self.observations = None
 
-
-    def is_update_required(self,observations):
+    def is_update_required(self, observations):
         """
 
         :param observations:
@@ -100,11 +97,11 @@ class GraphObsForRailEnv(ObservationBuilder):
         for a in self.env.agents:
             localStatus = False
             cur_pos = a.position if a.position is not None else a.initial_position \
-                           if a.status != RailAgentStatus.DONE_REMOVED \
-                           else a.target
+                if a.status != RailAgentStatus.DONE_REMOVED \
+                else a.target
             try:
-                cur_pos_on_traj = [num for num,cell in enumerate(self.cells_sequence[a.handle])
-                               if np.all(cell == cur_pos)][0]
+                cur_pos_on_traj = [num for num, cell in enumerate(self.cells_sequence[a.handle])
+                                   if np.all(cell == cur_pos)][0]
             except:
                 print(a.handle, cur_pos, self.cells_sequence[a.handle])
             next_pos_on_traj = cur_pos_on_traj + 1
@@ -118,13 +115,10 @@ class GraphObsForRailEnv(ObservationBuilder):
 
             self.cur_pos_list.append([cur_pos, next_pos, localStatus])
 
-
-
         if self.ts == 0:
             return True
 
         return Status
-
 
     def _find_forks(self):
         """
@@ -133,7 +127,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         :return:
         """
 
-        forks = set() # Set of nodes as tuples/coordinates
+        forks = set()  # Set of nodes as tuples/coordinates
         # Identify cells hat are nodes (have switches)
         for i in range(self.env.height):
             for j in range(self.env.width):
@@ -159,7 +153,6 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         return forks
 
-
     def get_many(self, handles) -> {}:
         """
         Compute observations for all agents in the env.
@@ -167,7 +160,6 @@ class GraphObsForRailEnv(ObservationBuilder):
         :return:
         """
         return self.get()
-
 
     def get(self) -> {}:
         """
@@ -189,8 +181,8 @@ class GraphObsForRailEnv(ObservationBuilder):
         if self.ts > 0:
             for a in self.env.agents:
                 current_position = a.position if a.position is not None \
-                                 else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED \
-                                 else tuple((0,0))
+                    else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED \
+                    else tuple((0, 0))
                 self.agent_position_data[a.handle].append(current_position)
 
         observations = copy.deepcopy(self.base_graph)
@@ -200,9 +192,7 @@ class GraphObsForRailEnv(ObservationBuilder):
             self.observations = self.populate_graph(observations)
             self.observations.setCosts()
 
-
         return self.observations
-
 
     def populate_graph(self, observations):
         """
@@ -214,9 +204,8 @@ class GraphObsForRailEnv(ObservationBuilder):
         agent_initial_positions = defaultdict(list)
         for a in self.env.agents:
             new_edge = [observations.vertices[vertex] for vertex in observations.vertices \
-                                                if a.initial_position in observations.vertices[vertex].Cells][0]
+                        if a.initial_position in observations.vertices[vertex].Cells][0]
             agent_initial_positions[a.handle] = [a.initial_position, new_edge]
-
 
         for a in range(self.env.number_of_agents):
 
@@ -227,7 +216,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
             # Build one vector of time spent on already travelled trajectory
             # and the planned one
-            agent_time_stepwise = [int(1/self.env.agents[a].speed_data['speed'])]*len(self.cells_sequence[a])
+            agent_time_stepwise = [int(1 / self.env.agents[a].speed_data['speed'])] * len(self.cells_sequence[a])
             time_data = [len(list(i_list)) for i, i_list in groupby(self.agent_position_data[a])]
             agent_time_stepwise = time_data + agent_time_stepwise[len(time_data):]
 
@@ -241,23 +230,22 @@ class GraphObsForRailEnv(ObservationBuilder):
 
             # start with the beginning
             # find next exit on trajectory
-            while(True):
+            while (True):
 
                 # check what sort of vertex the agent is at right now.
                 if agent_current_vertex.Type == "junction" \
                         or (agent_current_vertex.Type == "edge" and \
-                        len(agent_current_vertex.Cells) == 1):
+                            len(agent_current_vertex.Cells) == 1):
 
-                    agent_next_position = agent_trajectory[agent_pos_on_traj+1]
-                    agent_next_pos_on_traj = agent_pos_on_traj+1
+                    agent_next_position = agent_trajectory[agent_pos_on_traj + 1]
+                    agent_next_pos_on_traj = agent_pos_on_traj + 1
 
-
-                    if (agent_current_vertex.Type == "edge" and agent_current_vertex.Cells[0] != agent_trajectory[-2])\
+                    if (agent_current_vertex.Type == "edge" and agent_current_vertex.Cells[0] != agent_trajectory[-2]) \
                             or agent_current_vertex.Type == "junction":
                         try:
                             agent_next_vertex, agent_next_dir = \
-                                        [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
-                                                if agent_next_position in item[1].Cells][0]
+                                [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
+                                 if agent_next_position in item[1].Cells][0]
                         except:
                             print("debug")
 
@@ -273,17 +261,21 @@ class GraphObsForRailEnv(ObservationBuilder):
 
 
                 elif agent_current_vertex.Type == "edge":
+                    #TODO CHECK 21 WITH GAURAV
+                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj + 1:agent_pos_on_traj + 21]:
 
-                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1:]:
+                        agent_next_vertex, agent_next_dir = \
+                        [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
+                         if item[0] == agent_current_vertex.Cells[0]][0]
 
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[0]][0]
+                        agent_next_position = \
+                        [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
 
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
-
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
+                        agent_next_pos_on_traj = agent_pos_on_traj + \
+                                                 [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
+                                                  if
+                                                  cell[0] == agent_next_position[0] and cell[1] == agent_next_position[
+                                                      1]][0]
 
                         agent_current_vertex.Trains.append(a)
                         agent_current_vertex.TrainsDir.append(agent_next_dir)
@@ -292,16 +284,20 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
                         agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
 
-                    elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj+1:]:
+                    elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj + 1:]:
 
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[-1]][0]
+                        agent_next_vertex, agent_next_dir = \
+                        [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
+                         if item[0] == agent_current_vertex.Cells[-1]][0]
 
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
+                        agent_next_position = \
+                        [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
 
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
+                        agent_next_pos_on_traj = agent_pos_on_traj + \
+                                                 [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
+                                                  if
+                                                  cell[0] == agent_next_position[0] and cell[1] == agent_next_position[
+                                                      1]][0]
 
                         agent_current_vertex.Trains.append(a)
                         agent_current_vertex.TrainsDir.append(agent_next_dir)
@@ -311,7 +307,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
 
                     elif agent_trajectory[-2] in agent_current_vertex.Cells:
-                        #print("Trajectory End")
+                        # print("Trajectory End")
                         break
 
                 start_timestamp = end_timestamp
@@ -320,10 +316,6 @@ class GraphObsForRailEnv(ObservationBuilder):
                 agent_pos_on_traj = agent_next_pos_on_traj
 
         return observations
-
-
-
-
 
     # For Global Graph
     def build_global_graph(self):
@@ -353,16 +345,15 @@ class GraphObsForRailEnv(ObservationBuilder):
                     edge_vertex_cells = path[2][1:-1]
                     edge_vertex = self.base_graph.add_edge_vertex("edge", edge_vertex_cells)
                     edge_vertex.DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents),
-                                                     dtype=np.uint8)
+                                                          dtype=np.uint8)
 
                     vertex.Links.append([junctions, edge_vertex])
                     edge_vertex.Links.append([edge_vertex_cells[0], vertex])
 
                 else:
                     if str(path[0])[1:-1] in self.base_graph.vertices:
-
                         vertex.Links.append([junctions, self.base_graph.vertices[str(path[0])[1:-1]]])
-                        self.base_graph.vertices[str(path[0])[1:-1]].Links.append([path[0],vertex])
+                        self.base_graph.vertices[str(path[0])[1:-1]].Links.append([path[0], vertex])
 
     def _step_extend(self, current, direction):
         """
@@ -419,7 +410,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     temp, temp1 = self._step_extend(position, direction)
 
-                    return temp, traj+temp1
+                    return temp, traj + temp1
             else:
                 return [position, total_transitions], traj
 
@@ -432,7 +423,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         init_position = current
         node_list = []
 
-        for direction in [0,1,2,3]:
+        for direction in [0, 1, 2, 3]:
 
             traj = []
             traj.append(init_position)
@@ -461,7 +452,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                     # if straight : means dead end
                     # if simple left : explore recursively by changing direction to left
                     # if simple right : explore recursively by changing direction to right
-                    #position = get_new_position(position, direction)
+                    # position = get_new_position(position, direction)
 
                     cell_transitions_bitmap = np.asarray([int(item) for item in cell_transitions_bitmap[2:]])
                     pos = np.where(cell_transitions_bitmap == 1)
@@ -472,7 +463,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         traj.append(position)
 
                     else:
-                        if pos[0] in [1,14] or pos[1] in [1, 14]:  # simple right
+                        if pos[0] in [1, 14] or pos[1] in [1, 14]:  # simple right
                             if direction == 0:
                                 direction = (direction + 1) % 4
                             elif direction == 3:
@@ -505,7 +496,6 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         return node_list
 
-
     def setDeadLocks(self, obs):
 
         # find the agent's remaining trajectory
@@ -515,14 +505,13 @@ class GraphObsForRailEnv(ObservationBuilder):
         agent_pos = []
         agent_traj = []
         for a in self.env.agents:
-            #agent_pos.append(a.position if a.position is not None
+            # agent_pos.append(a.position if a.position is not None
             #                 else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED
             #                 else a.target)
-            agent_pos_on_traj = [num for num,item in enumerate(self.cells_sequence[a.handle])
+            agent_pos_on_traj = [num for num, item in enumerate(self.cells_sequence[a.handle])
                                  if item[0] == self.cur_pos_list[a.handle][0][0]
                                  and item[1] == self.cur_pos_list[a.handle][0][1]][0]
             agent_traj.append(self.cells_sequence[a.handle][agent_pos_on_traj:])
-
 
         dead_lock_matrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
 
@@ -531,9 +520,9 @@ class GraphObsForRailEnv(ObservationBuilder):
                 if agent_id != other_agent_id:
 
                     if not self.cur_pos_list[agent_id][2] and len(trajectory) > 3:
-                        is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
-                                               if item[0][0] == trajectory[1][0]
-                                               and item[0][1] == trajectory[1][1]]
+                        is_next_in_queue = [num for num, item in enumerate(self.cur_pos_list)
+                                            if item[0][0] == trajectory[1][0]
+                                            and item[0][1] == trajectory[1][1]]
 
                         if len(is_next_in_queue):
                             new_dead_locks = []
@@ -547,11 +536,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         vertex_end_1 = obs.vertices[deadlock[2]].Cells[0]
                                         vertex_end_2 = obs.vertices[deadlock[2]].Cells[-1]
 
-                                        end_pos = [num for num,item in enumerate(trajectory)
-                                                     if (item[0] == vertex_end_1[0]
-                                                     and item[1] == vertex_end_1[1])
-                                                     or (item[0] == vertex_end_2[0]
-                                                     and item[1] == vertex_end_2[1])]
+                                        end_pos = [num for num, item in enumerate(trajectory)
+                                                   if (item[0] == vertex_end_1[0]
+                                                       and item[1] == vertex_end_1[1])
+                                                   or (item[0] == vertex_end_2[0]
+                                                       and item[1] == vertex_end_2[1])]
 
                                         if len(end_pos):
                                             new_dead_locks.append([agent_id, deadlock[1], deadlock[2]])
@@ -587,8 +576,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                     #         break
                     #
 
-
-                    #if len(is_next_in_queue) \
+                    # if len(is_next_in_queue) \
                     #        and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
                     #        and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\
                     #        and self.env.agents[agent_id].position is not None:
@@ -596,12 +584,12 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     else:
 
-                        pos_first_in_second = [num for num,item in enumerate(trajectory)
-                                              if item[0] == other_trajectory[0][0]
-                                              and item[1] == other_trajectory[0][1]]
+                        pos_first_in_second = [num for num, item in enumerate(trajectory)
+                                               if item[0] == other_trajectory[0][0]
+                                               and item[1] == other_trajectory[0][1]]
 
                         if len(pos_first_in_second):
-                            first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0]+1][::-1]
+                            first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0] + 1][::-1]
 
                             if len(first_agent_traj_from_overlap) > 1:
                                 incre = 0
@@ -624,25 +612,35 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                                             for vertex in obs.vertices:
 
-                                                is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
-                                                                    if first_agent_traj_from_overlap[pos_on_conflict_section][0]
+                                                is_pos_on_vertex = [num for num, item in
+                                                                    enumerate(obs.vertices[vertex].Cells)
+                                                                    if first_agent_traj_from_overlap[
+                                                                        pos_on_conflict_section][0]
                                                                     == item[0] and
-                                                                    first_agent_traj_from_overlap[pos_on_conflict_section][1]
+                                                                    first_agent_traj_from_overlap[
+                                                                        pos_on_conflict_section][1]
                                                                     == item[1]]
 
                                                 if len(is_pos_on_vertex):
                                                     if obs.vertices[vertex].Type == "edge":
                                                         if obs.vertices[vertex].update_ts < self.ts:
-                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros(
+                                                                (self.env.number_of_agents, self.env.number_of_agents),
+                                                                dtype=np.uint8)
                                                             obs.vertices[vertex].update_ts = self.ts
 
-                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][
+                                                            other_agent_id] = 1
 
-                                                        exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
+                                                        exit_point = obs.vertices[vertex].other_end(
+                                                            first_agent_traj_from_overlap[pos_on_conflict_section])
 
-                                                        exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
-                                                                                            if item[0] == exit_point[0]
-                                                                                            and item[1] == exit_point[1]]
+                                                        exit_position_on_conflict_section = [num for num, item in
+                                                                                             enumerate(
+                                                                                                 first_agent_traj_from_overlap)
+                                                                                             if item[0] == exit_point[0]
+                                                                                             and item[1] == exit_point[
+                                                                                                 1]]
 
                                                         if len(exit_position_on_conflict_section):
 
@@ -650,24 +648,29 @@ class GraphObsForRailEnv(ObservationBuilder):
                                                                     not in obs.Deadlocks):
                                                                 obs.Deadlocks.append([agent_id, other_agent_id, vertex])
 
-                                                            if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
-                                                                pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
+                                                            if len(first_agent_traj_from_overlap) > \
+                                                                    exit_position_on_conflict_section[0] + 1:
+                                                                pos_on_conflict_section = \
+                                                                exit_position_on_conflict_section[0] + 1
                                                                 break
                                                             else:
                                                                 outer = False
                                                                 break
                                                         else:
-                                                            #print("possibly wrong calculation in deadlock")
+                                                            # print("possibly wrong calculation in deadlock")
 
                                                             outer = False
                                                             break
                                                     else:
 
                                                         if obs.vertices[vertex].update_ts < self.ts:
-                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros(
+                                                                (self.env.number_of_agents, self.env.number_of_agents),
+                                                                dtype=np.uint8)
                                                             obs.vertices[vertex].update_ts = self.ts
 
-                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
+                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][
+                                                            other_agent_id] = 1
 
                                                         if len(first_agent_traj_from_overlap) > \
                                                                 pos_on_conflict_section + 1:
@@ -677,14 +680,15 @@ class GraphObsForRailEnv(ObservationBuilder):
                                                             outer = False
                                                             break
                                         break
-                                    elif not(first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
-                                            and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][1]):
+                                    elif not (first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
+                                              and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][
+                                                  1]):
                                         # this is the point of seperation
                                         # might not be safe.
 
                                         next_exit_point = other_trajectory[incre]
 
-                                        last_is_occupied = [num for num,item in enumerate(self.cur_pos_list)
+                                        last_is_occupied = [num for num, item in enumerate(self.cur_pos_list)
                                                             if item[0][0] == next_exit_point[0]
                                                             and item[0][1] == next_exit_point[1]]
 
@@ -693,7 +697,6 @@ class GraphObsForRailEnv(ObservationBuilder):
                                         break
 
                                     incre += 1
-
 
     def update_for_delay(self, observations, a, vert_type):
         """
@@ -706,7 +709,7 @@ class GraphObsForRailEnv(ObservationBuilder):
         is_last_edge = False
 
         current_edge = [observations.vertices[vertex] for vertex in observations.vertices \
-                            if agent.initial_position in observations.vertices[vertex].Cells][0]
+                        if agent.initial_position in observations.vertices[vertex].Cells][0]
 
         # collect all junctions until next edge
         next_vertex = current_edge
@@ -746,11 +749,12 @@ class GraphObsForRailEnv(ObservationBuilder):
             elif vert_type == "junction":
                 current_time_val = junc_list[::-1][1][1][1]
 
-                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+                next_list.append(
+                    [[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]],
+                     junc_list[::-1][0][0]])
 
                 for item in junc_list[::-1][1:-1]:
-
-                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    next_list.append([[current_time_val - 1, current_time_val], item[0]])
                     current_time_val -= 1
 
                 next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
@@ -760,11 +764,12 @@ class GraphObsForRailEnv(ObservationBuilder):
             elif vert_type == "edge":
                 current_time_val = junc_list[::-1][0][1][0]
 
-                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
+                next_list.append(
+                    [[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]],
+                     junc_list[::-1][0][0]])
 
                 for item in junc_list[::-1][1:-1]:
-
-                    next_list.append([[current_time_val-1,current_time_val], item[0]])
+                    next_list.append([[current_time_val - 1, current_time_val], item[0]])
                     current_time_val -= 1
 
                 next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
@@ -775,7 +780,6 @@ class GraphObsForRailEnv(ObservationBuilder):
                 junc_list_temp = [item[1][1] - item[1][0] for item in junc_list]
                 next_list_temp = [item[0][1] - item[0][0] for item in next_list]
                 initial_lapse = abs(((np.sum(junc_list_temp)) - ((np.sum(next_list_temp)))))
-
 
             next_vertex = current_edge
 
@@ -790,9 +794,9 @@ class GraphObsForRailEnv(ObservationBuilder):
                     next_vertex.TrainsTime[agent_index][1] = next_list[filler_index][0][1]
 
                 elif filler_index > 0:
-                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
-                        next_vertex.TrainsTime[agent_index][0] += initial_lapse
-                        next_vertex.TrainsTime[agent_index][1] += initial_lapse
+                    agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
+                    next_vertex.TrainsTime[agent_index][0] += initial_lapse
+                    next_vertex.TrainsTime[agent_index][1] += initial_lapse
 
                 filler_index += 1
 
