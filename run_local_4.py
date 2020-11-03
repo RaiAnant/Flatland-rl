@@ -28,12 +28,12 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 40
+    NUMBER_OF_AGENTS = 100
     width = 25
     height = 25
     max_prediction_depth = 200
     NUM_CITIES = 2
-    SIGNAL_TIMER = 5
+    SIGNAL_TIMER = 4
     # problem
     # NUMBER_OF_AGENTS = 100
     # width = 25
@@ -64,41 +64,16 @@ if __name__ == "__main__":
 
     obs_list = []
 
-    #conflict_data = []
-
-    #obs_temp = copy.deepcopy(obs)
-
     for step in range(20 * (width + height + 20)):
 
         print("==================== ",step)
-
-        #obs.Deadlocks = conflict_data
-
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        #observation_builder.setDeadLocks(obs)
-        #obs.setCosts()
-        #obs_list.append(obs_temp)
-
-        #conflict_data = obs.Deadlocks
-        """
-        obs = optimize(observation_builder, obs, "edge")
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        obs = optimize(observation_builder, obs, "junction")
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        """
 
         _action = get_action_dict_safety(observation_builder, SIGNAL_TIMER)
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
 
-
         next_obs, all_rewards, done, _ = env.step(_action)
-
-        #print("Rewards: {}, [done={}]".format(all_rewards, done))
 
         img = env_renderer.render_env(show=True,
                                       show_inactive_agents=False,
@@ -108,8 +83,6 @@ if __name__ == "__main__":
                                       return_image= True)
 
         cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
-
-        #time.sleep(1.0)
 
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:

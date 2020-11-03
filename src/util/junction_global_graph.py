@@ -36,10 +36,13 @@ class vertex:
 
         self.currently_residing_agents = []
 
+        self.is_signal_on = False
+
         #self.signal_time = 0
         #self.signal_deadlocks = []
         self.is_safe = True
         self.occupancy = 0
+        self.extended_capacity = len(node)
         self.capacity = len(node)
 
     def __str__(self):
@@ -109,25 +112,30 @@ class vertex:
         else:
             self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
 
-        # for agent_pos_id, agent_id in enumerate(self.Trains):
-        #
-        #     if self.TrainsTime[agent_pos_id][0] != 0:
-        #         self.CostPerTrain.append(
-        #                     abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
-        #                     + np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000)
-        #
-        #         self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 5000
-        #
-        #     else:
-        #         self.CostPerTrain.append(abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
-        #
-        #
-        #     self.CostDeadLockTotal += np.count_nonzero(self.DeadLockMatrix[agent_id]) * 50000
-        #     self.DeadlockCostPerTrain.append(np.count_nonzero(self.DeadLockMatrix[agent_id]) * 100000)
-        #
-        #     self.CostTransitionTimeTotal += abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
-        #
-        # self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal + self.CostDeadLockTotal
+    def setExtendedCapacity(self):
+        """
+
+        :return:
+        """
+
+        if self.is_safe:
+            pending_to_explore = []
+            explored = []
+            explored.append(self.id)
+            for vertex in self.Links:
+                if vertex[1].is_safe:
+                    pending_to_explore.append(vertex[1])
+
+            capacity = 0
+            while len(pending_to_explore):
+                vertex = pending_to_explore.pop()
+                explored.append(vertex.id)
+                capacity += len(vertex.Cells)
+                for next_vertex in vertex.Links:
+                    if next_vertex[1].is_safe and next_vertex[1].id not in explored:
+                        pending_to_explore.append(next_vertex[1])
+
+            self.extended_capacity = self.capacity + capacity
 
 
 class Global_Graph:
@@ -159,6 +167,10 @@ class Global_Graph:
             if len(self.vertices[vertex].Trains):
                 self.vertices[vertex].setCosts()
             #cost += self.vertices[vertex].CostTotal
+
+        for vertex in self.vertices:
+            if len(self.vertices[vertex].Trains):
+                self.vertices[vertex].setExtendedCapacity()
 
         #self.CostTotalEnv = cost
 

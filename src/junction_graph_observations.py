@@ -105,7 +105,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                            if a.status != RailAgentStatus.DONE_REMOVED \
                            else tuple((0,0))
             if cur_pos[0] == 0 and cur_pos[1] == 0:
-                self.cur_pos_list.append([cur_pos, cur_pos, False, [], True])
+                self.cur_pos_list.append([cur_pos, cur_pos, False, [], True, True])
             else:
                 cur_pos_on_traj = [num for num,cell in enumerate(self.cells_sequence[a.handle])
                            if cell[0] == cur_pos[0] and cell[1] == cur_pos[1]][0]
@@ -114,7 +114,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                 next_pos = self.cells_sequence[a.handle][next_pos_on_traj]
 
                 if next_pos[0] == 0 and next_pos[1] == 0:
-                    self.cur_pos_list.append([cur_pos, next_pos, False, [], True])
+                    self.cur_pos_list.append([cur_pos, next_pos, False, [], True, True])
                 else:
 
                     for signals in self.observations.vertices:
@@ -127,17 +127,18 @@ class GraphObsForRailEnv(ObservationBuilder):
                         if next_pos in self.observations.vertices[signals].Cells:
                             next_vertex = self.observations.vertices[signals]
 
+                    if next_vertex == None:
+                        self.cur_pos_list.append([cur_pos, next_pos, False, [], True, True])
+                        continue
 
                     if a.handle not in cur_vertex.currently_residing_agents:
                         cur_vertex.currently_residing_agents.append(a.handle)
 
-                    if cur_vertex == next_vertex and cur_vertex != None and next_vertex != None:
+                    if cur_vertex.id == next_vertex.id:
 
                         # Need this info to check potential clipping
                         # although it doesn't need an action
                         vert_list = []
-
-                        initial_safe_switch = False if cur_vertex.is_safe else True
 
                         if next_vertex.TrainsTraversal[a.handle][1] != None:
                             next_vertex = next_vertex.TrainsTraversal[a.handle][1]
@@ -152,7 +153,7 @@ class GraphObsForRailEnv(ObservationBuilder):
                         else:
                             vert_list.append(next_vertex)
 
-                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, initial_safe_switch])
+                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe])
 
                     else:
 
@@ -161,8 +162,25 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                         vert_list = []
 
-                        initial_safe_switch = False if cur_vertex.is_safe else True
-                        next_safe_switch = False if next_vertex.is_safe else True
+                        #initial_safe_switch = False if cur_vertex.is_safe else True
+                        #next_safe_switch = False if next_vertex.is_safe else True
+
+                        # determine if it is safe to unsafe
+                        # or unsafe to safe
+                        # or safe to safe or unsafe to unsafe
+
+                        decision = []
+                        if cur_vertex.is_safe and next_vertex.is_safe:
+                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
+                        elif not cur_vertex.is_safe and not next_vertex.is_safe:
+                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
+                        elif not cur_vertex.is_safe and next_vertex.is_safe:
+                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
+                        elif cur_vertex.is_safe and not next_vertex.is_safe:
+                            decision = [cur_pos, next_pos, True, vert_list, False, cur_vertex.is_safe]
+
+                        if decision == []:
+                            print("problem")
 
                         while True:
                             if next_vertex.is_safe:
@@ -172,10 +190,8 @@ class GraphObsForRailEnv(ObservationBuilder):
                                 vert_list.append(next_vertex)
                                 next_vertex = next_vertex.TrainsTraversal[a.handle][1]
 
-                        if initial_safe_switch:
-                            self.cur_pos_list.append([cur_pos, next_pos, not next_safe_switch, vert_list, initial_safe_switch])
-                        else:
-                            self.cur_pos_list.append([cur_pos, next_pos, next_safe_switch, vert_list, initial_safe_switch])
+                        decision[3] = vert_list
+                        self.cur_pos_list.append(decision)
 
 
 

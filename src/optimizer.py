@@ -424,201 +424,165 @@ def agent_clipping(observation_builder):
 def get_action_dict_safety(observation_builder, signal_timer):
 
     actions = defaultdict()
-
     blocked_edges = []
 
-
-    # allow actions based on junctions data
+    # nothing should stop movement in safe zone
     for a, row in enumerate(observation_builder.cur_pos_list):
-        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
-            if observation_builder.cur_pos_list[a][3][0].id in observation_builder.signal_time.keys():
-                if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
 
-                    if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
-                            == len(observation_builder.cur_pos_list[a][3]):
-                        equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
-                                        zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
-                                            observation_builder.cur_pos_list[a][3])]
+        # not already decided
+        if a not in actions.keys():
 
-                        if not np.count_nonzero(equal_status):
-                            if observation_builder.cur_pos_list[a][3][-1].capacity - \
-                                    observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
-                                cur_position = observation_builder.cur_pos_list[a][0]
-                                next_position = observation_builder.cur_pos_list[a][1]
-
-                                actions = get_valid_action(observation_builder,
-                                                           a,
-                                                           cur_position,
-                                                           next_position,
-                                                           actions)
-
-                                if observation_builder.cur_pos_list[a][4]:
-                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
-                                    # set claim on exit cell
-                                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                                        blocked_edges.append(edge)
-
-
-    for item in observation_builder.signal_time:
-        if observation_builder.signal_time[item] > 0:
-            observation_builder.signal_time[item] -= 1
-
-
-    # those which are not changing zones
-    # if travelling in safe zone; get action
-    # if not get action and set blockages
-    for a, row in enumerate(observation_builder.cur_pos_list):
-        if not observation_builder.cur_pos_list[a][2] and a not in actions.keys():
-
-            cur_position = observation_builder.cur_pos_list[a][0]
-            next_position = observation_builder.cur_pos_list[a][1]
-
-            actions = get_valid_action(observation_builder,
-                                       a,
-                                       cur_position,
-                                       next_position,
-                                       actions)
-
+            # if clear priority
             if observation_builder.cur_pos_list[a][4]:
-                if len(observation_builder.cur_pos_list[a][3]):
-                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
-                    # set claim on exit cell
-                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                        blocked_edges.append(edge)
 
+                # if next is safe
+                # whether current is unsafe or safe
+                cur_position = observation_builder.cur_pos_list[a][0]
+                next_position = observation_builder.cur_pos_list[a][1]
 
-
-    for a, row in enumerate(observation_builder.cur_pos_list):
-        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
-
-            if observation_builder.cur_pos_list[a][3][-1].capacity - \
-                    observation_builder.cur_pos_list[a][3][-1].occupancy>0\
-                    or observation_builder.cur_pos_list[a][3][0].is_safe:
-                blocked = False
-                for transit_edge in observation_builder.cur_pos_list[a][3]:
-
-                    if transit_edge in blocked_edges:
-                        blocked = True
-                        break
-
-                if blocked:
-                    actions[a] = 4
-                    continue
-                else:
-                    cur_position = observation_builder.cur_pos_list[a][0]
-                    next_position = observation_builder.cur_pos_list[a][1]
-
-                    actions = get_valid_action(observation_builder,
-                                               a,
-                                               cur_position,
-                                               next_position,
-                                               actions)
-
-                    # because the agent is allowed
-                    # it should set occupancy on the exit cell
-                    #observation_builder.occupancy[observation_builder.cur_pos_list[a][3][-1].id] += 1
-                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
-                    # it should also set on the junction,
-                    # the list of vertices which are blocked for this agent
-                    observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
-                    #observation_builder.cur_pos_list[a][3][0].signal_deadlocks.append(observation_builder.cur_pos_list[a][3])
-                    # and the number of timesteps it should wait and
-                    # see if another agent is going in the same direction
-                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
-                    #observation_builder.cur_pos_list[a][3][0].signal_time = 3
-
-
-                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
-                        blocked_edges.append(edge)
-            else:
-                actions[a] = 4
-
-    """
-    #priority, clipped_agents = agent_clipping(observation_builder)
-    #have_path_unblocked = []
-    for a, row in enumerate(observation_builder.cur_pos_list):
-        if observation_builder.cur_pos_list[a][2] and a not in actions.keys():
-
-            # first check if competing with any agent at the first vertex
-            # if yes
-            # check its priority
-            # if more than the current agent then stop
-            # else check if any agent is already at this edge
-
-            # if the agent
-            # has already entered blocked section
-            if observation_builder.cur_pos_list[a][4]:
                 actions = get_valid_action(observation_builder,
                                            a,
                                            cur_position,
                                            next_position,
                                            actions)
 
-            else:
-                blocked = False
-                outer = True
-                for vertex in observation_builder.cur_pos_list[a][3]:
-                    if not outer:
-                        break
+                if len(observation_builder.cur_pos_list[a][3]):
+                    # if not on safe edge already
+                    # set all the remaining edges as blocked
+                    if not observation_builder.cur_pos_list[a][5]:
+                        # set claim on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
 
-                    if len(vertex.currently_residing_agents):
-                        for agents in vertex.currently_residing_agents:
-                            try:
-                                if vertex.TrainsTraversal[agents][1] == vertex.TrainsTraversal[a][0]:
-                                    blocked = True
-                                    outer = False
-                                    break
-                            except:
-                                print("here")
+    # allow actions based on junctions data
+    for a, row in enumerate(observation_builder.cur_pos_list):
 
-                    for num, agents_data in enumerate(observation_builder.cur_pos_list):
-                        if len(agents_data[3]):
-                            if agents_data[3][0] == vertex:
-                                if priority[num] > priority[a]:
-                                    blocked = True
-                                    outer = False
-                                    break
+        # not already decided
+        if a not in actions.keys():
 
-                #
-                if not blocked:
-                    cur_position = observation_builder.cur_pos_list[a][0]
-                    next_position = observation_builder.cur_pos_list[a][1]
+            # if entering unsafe zone
+            if observation_builder.cur_pos_list[a][2]:
 
-                    actions = get_valid_action(observation_builder,
-                                               a,
-                                               cur_position,
-                                               next_position,
-                                               actions)
+                # if the entry junction is already entered by any agent before
+                if observation_builder.cur_pos_list[a][3][0].id in observation_builder.signal_time.keys():
 
-                    for item in clipped_agents[a]:
+                    # if the timer set by the agent hasn't expired
+                    if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
+
+                        # if their deadlock zone have same length
+                        if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
+                                == len(observation_builder.cur_pos_list[a][3]):
+                            equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
+                                            zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
+                                                observation_builder.cur_pos_list[a][3])]
+
+                            # if they are all the same in the same order
+                            if not np.count_nonzero(equal_status):
+
+                                # if the capacity of exit vertex is not already full
+                                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                                    cur_position = observation_builder.cur_pos_list[a][0]
+                                    next_position = observation_builder.cur_pos_list[a][1]
+
+                                    actions = get_valid_action(observation_builder,
+                                                               a,
+                                                               cur_position,
+                                                               next_position,
+                                                               actions)
+
+                                    # set claim on exit cell
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                    # add all unsafe edges on teh way to global block list
+                                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                                        if edge not in blocked_edges:
+                                            blocked_edges.append(edge)
+
+                                    # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                                    observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                                    # because the agent is allowed
+                                    # it should set occupancy on the exit cell
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                    # it should also set on the junction,
+                                    # the list of vertices which are blocked for this agent
+                                    observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                                    # and the number of timesteps it should wait and
+                                    # see if another agent is going in the same direction
+                                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
+
+
+    # decrement signal timers as the decision based on junction data is taken
+    for item in observation_builder.signal_time:
+        if observation_builder.signal_time[item] > 0:
+            observation_builder.signal_time[item] -= 1
+        else:
+            observation_builder.observations.vertices[item].is_signal_on = False
+
+    # Fresh entry in unsafe zone
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            # if entering unsafe zone
+            if observation_builder.cur_pos_list[a][2]:
+
+                # if no place left after real agents at the exit section or existing claims to exit section
+                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                    blocked = False
+                    for transit_edge in observation_builder.cur_pos_list[a][3][:-1]:
+
+                        # if edge not blocked
+                        if transit_edge in blocked_edges:
+                            blocked = True
+                            break
+                        # if no signal is on in opposite direction
+                        if transit_edge.is_signal_on:
+                            blocked = True
+                            break
+
+                    if blocked:
+                        actions[a] = 4
+                    else:
+                        cur_position = observation_builder.cur_pos_list[a][0]
+                        next_position = observation_builder.cur_pos_list[a][1]
+
                         actions = get_valid_action(observation_builder,
-                                               item,
-                                               cur_position,
-                                               next_position,
-                                               actions)
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
+
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
+
+                        # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                        observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                        # because the agent is allowed
+                        # it should set occupancy on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # it should also set on the junction,
+                        # the list of vertices which are blocked for this agent
+                        observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                        # and the number of timesteps it should wait and
+                        # see if another agent is going in the same direction
+                        observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
                 else:
                     actions[a] = 4
-                    for item in clipped_agents[a]:
-                        actions[item] = 4
-    """
 
-    # for all other agents
-    # for a, row in enumerate(observation_builder.cur_pos_list):
-    #     if a not in actions.keys():
-    #         cur_position = observation_builder.cur_pos_list[a][0]
-    #         next_position = observation_builder.cur_pos_list[a][1]
-    #
-    #         if cur_position[0] != 0 or cur_position[1] != 0:
-    #
-    #             if next_position[0] != 0 or next_position[1] != 0:
-    #
-    #                 actions = get_valid_action(observation_builder,
-    #                                            a,
-    #                                            cur_position,
-    #                                            next_position,
-    #                                            actions)
-    #             else:
-    #                 actions[a] = 2
+    # set everything else to halt
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            actions[a] = 4
 
     return actions
 
@@ -691,7 +655,7 @@ def get_action_dict_junc(observation_builder, obs):
                     target_safe_vertex = copy.deepcopy(target_edge_vertex)
 
                 # if no capacity on next safe edge the send stop signal
-                if target_safe_vertex[0].capacity <= target_safe_vertex[0].occupancy:
+                if target_safe_vertex[0].extended_capacity <= target_safe_vertex[0].occupancy:
                     actions[a] = 4
                     continue
 
