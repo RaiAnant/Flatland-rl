@@ -426,11 +426,23 @@ def get_action_dict_safety(observation_builder, signal_timer):
     actions = defaultdict()
     blocked_edges = []
 
-    # nothing should stop movement in safe zone
+    # nothing should stop movement within the safe zone or unsafe zone
     for a, row in enumerate(observation_builder.cur_pos_list):
 
         # not already decided
         if a not in actions.keys():
+
+            # if observation_builder.env.agents[a].status == RailAgentStatus.READY_TO_DEPART:
+            #     continue
+            #
+            # if observation_builder.env.agents[a].position == None:
+            #     continue
+            #
+            # if observation_builder.env.agents[a].position[0] == \
+            #         observation_builder.env.agents[a].initial_position[0] and \
+            #         observation_builder.env.agents[a].position[1] == \
+            #         observation_builder.env.agents[a].initial_position[1]:
+            #     continue
 
             # if clear priority
             if observation_builder.cur_pos_list[a][4]:
@@ -534,7 +546,6 @@ def get_action_dict_safety(observation_builder, signal_timer):
                                     # see if another agent is going in the same direction
                                     observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
 
-
     # decrement signal timers as the decision based on junction data is taken
     for item in observation_builder.signal_time:
         if observation_builder.signal_time[item] > 0:
@@ -596,6 +607,132 @@ def get_action_dict_safety(observation_builder, signal_timer):
                         observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
                 else:
                     actions[a] = 4
+
+    # fresh start
+    """
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            initial_allowed = False
+
+            if observation_builder.env.agents[a].status == RailAgentStatus.DONE_REMOVED:
+                initial_allowed = False
+            elif observation_builder.env.agents[a].position == None:
+                initial_allowed = False
+            elif observation_builder.env.agents[a].position[0] == \
+                    observation_builder.env.agents[a].initial_position[0] and \
+                    observation_builder.env.agents[a].position[1] == \
+                    observation_builder.env.agents[a].initial_position[1]:
+                initial_allowed = True
+
+            # if entering unsafe zone
+            if initial_allowed:
+
+                # if no place left after real agents at the exit section or existing claims to exit section
+                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                    blocked = False
+                    for transit_edge in observation_builder.cur_pos_list[a][3][:-1]:
+
+                        # if edge not blocked
+                        if transit_edge in blocked_edges:
+                            blocked = True
+                            break
+                        # if no signal is on in opposite direction
+                        if transit_edge.is_signal_on:
+                            blocked = True
+                            break
+
+                    if blocked:
+                        actions[a] = 4
+                    else:
+                        cur_position = observation_builder.cur_pos_list[a][0]
+                        next_position = observation_builder.cur_pos_list[a][1]
+
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
+
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
+
+                        # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                        observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                        # because the agent is allowed
+                        # it should set occupancy on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # it should also set on the junction,
+                        # the list of vertices which are blocked for this agent
+                        observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                        # and the number of timesteps it should wait and
+                        # see if another agent is going in the same direction
+                        observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
+                else:
+                    actions[a] = 4
+    """
+
+    # arrived from bay
+    """
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            # if entering unsafe zone
+            if observation_builder.env.agents[a].status == RailAgentStatus.READY_TO_DEPART:
+
+                # if no place left after real agents at the exit section or existing claims to exit section
+                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                    blocked = False
+                    for transit_edge in observation_builder.cur_pos_list[a][3][:-1]:
+
+                        # if edge not blocked
+                        if transit_edge in blocked_edges:
+                            blocked = True
+                            break
+                        # if no signal is on in opposite direction
+                        if transit_edge.is_signal_on:
+                            blocked = True
+                            break
+
+                    if blocked:
+                        actions[a] = 4
+                    else:
+                        cur_position = observation_builder.cur_pos_list[a][0]
+                        next_position = observation_builder.cur_pos_list[a][1]
+
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
+
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
+
+                        # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                        observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                        # because the agent is allowed
+                        # it should set occupancy on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # it should also set on the junction,
+                        # the list of vertices which are blocked for this agent
+                        observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                        # and the number of timesteps it should wait and
+                        # see if another agent is going in the same direction
+                        observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
+                else:
+                    actions[a] = 4
+    """
 
     # set everything else to halt
     for a, row in enumerate(observation_builder.cur_pos_list):

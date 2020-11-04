@@ -28,12 +28,12 @@ import cv2
 
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 120
-    width = 25
-    height = 25
-    max_prediction_depth = 200
+    NUMBER_OF_AGENTS = 200
+    width = 35
+    height = 35
+    max_prediction_depth = 300
     NUM_CITIES = 3
-    SIGNAL_TIMER = 4
+    SIGNAL_TIMER = 2
     # problem
     # NUMBER_OF_AGENTS = 100
     # width = 25
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
                                            grid_mode=False,
                                            max_rails_between_cities=3,
-                                           max_rails_in_city=3,
+                                           max_rails_in_city=4,
                                            seed=1500)
 
     observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=max_prediction_depth),
