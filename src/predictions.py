@@ -149,6 +149,7 @@ class ShortestPathPredictorForRailEnv(PredictionBuilder):
                             else a.target if self.env.agents[a.handle].status is RailAgentStatus.DONE_REMOVED \
                             else a.initial_position)
             for step in prediction_dict[a.handle]:
+
                 if np.isnan(step[4]):
                     cells_sequence[a.handle].append(a.target)
                     break

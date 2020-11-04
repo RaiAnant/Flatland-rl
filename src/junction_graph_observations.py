@@ -1,12 +1,9 @@
 """
 ObservationBuilder objects are objects that can be passed to environments designed for customizability.
 The ObservationBuilder-derived custom classes implement 2 functions, reset() and get() or get(handle).
-
 + `reset()` is called after each environment reset (i.e. at the beginning of a new episode), to allow for pre-computing relevant data.
-
 + `get()` is called whenever an observation has to be computed, potentially for each agent independently in case of \
 multi-agent environments.
-
 """
 
 import collections
@@ -73,7 +70,6 @@ class GraphObsForRailEnv(ObservationBuilder):
     def reset(self):
         """
         Inherited method used for pre computations.
-
         :param:
         :return:
         """
@@ -88,7 +84,6 @@ class GraphObsForRailEnv(ObservationBuilder):
 
     def set_agents_state(self):
         """
-
         :param observations:
         :return:
         """
@@ -191,7 +186,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                                 break
                             else:
                                 vert_list.append(next_vertex)
-                                next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+                                try:
+                                    next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+                                except IndexError:
+                                    print("Debug!")
 
                         decision[3] = vert_list
                         self.cur_pos_list.append(decision)
@@ -203,7 +201,6 @@ class GraphObsForRailEnv(ObservationBuilder):
     def _find_forks(self):
         """
         A fork (in the map) is either a switch or a diamond crossing.
-
         :return:
         """
 
@@ -278,7 +275,6 @@ class GraphObsForRailEnv(ObservationBuilder):
     def populate_graph(self, observations):
         """
         Inherited method used for pre computations.
-
         :return:
         """
 
@@ -358,7 +354,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                 elif agent_current_vertex.Type == "edge":
 
-                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1:]:
+                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1: agent_pos_on_traj+21]:
 
                         agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
                                              if item[0] == agent_current_vertex.Cells[0]][0]
@@ -428,7 +424,6 @@ class GraphObsForRailEnv(ObservationBuilder):
     # For Global Graph
     def build_global_graph(self):
         """
-
         :return:
         """
 
@@ -467,7 +462,6 @@ class GraphObsForRailEnv(ObservationBuilder):
 
     def _step_extend(self, current, direction):
         """
-
         :return:
         """
 
@@ -527,7 +521,6 @@ class GraphObsForRailEnv(ObservationBuilder):
 
     def _step(self, current):
         """
-
         :return:
         """
 
@@ -798,7 +791,6 @@ class GraphObsForRailEnv(ObservationBuilder):
     def update_for_delay(self, observations, a, vert_type):
         """
         Inherited method used for pre computations.
-
         :return:
         """
 

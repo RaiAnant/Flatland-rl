@@ -770,7 +770,13 @@ def get_action_dict_junc(observation_builder, obs):
                                  and next_position[1] != observation_builder.env.agents[a].target[1]]
 
             if len(next_pos_occupied):
-                actions[a] = 4
+                # Allow action here
+                # actions[a] = 4
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
 
             elif observation_builder.cur_pos_list[a][2]:
 
@@ -781,7 +787,10 @@ def get_action_dict_junc(observation_builder, obs):
                 target_vertex = [obs.vertices[item]
                                  for item in obs.vertices
                                  if next_position in obs.vertices[item].Cells][0]
-                agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
+                try:
+                    agent_pos_id = [num for num,item in enumerate(target_vertex.Trains) if item == a][0]
+                except IndexError:
+                    print("Debug")
                 target_edge_vertex = [item[1] for item in target_vertex.Links if a in item[1].Trains
                                       and item[1] != current_vertex]
 
@@ -852,7 +861,13 @@ def get_action_dict_junc(observation_builder, obs):
                                                    actions)
 
                     elif len(own_deadlocks) and max_dead_conflict_status > 100000:
-                        actions[a] = 4
+                        # Allow action Here
+                        # actions[a] = 4
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
 
                     # if it is with some other agents
                     elif len(others_deadlocks):
@@ -869,11 +884,22 @@ def get_action_dict_junc(observation_builder, obs):
                                 break
 
                         if not found:
-                            actions[a] = 4
+                            # Allow action here
+                            # actions[a] = 4
+                            actions = get_valid_action(observation_builder,
+                                                       a,
+                                                       cur_position,
+                                                       next_position,
+                                                       actions)
 
                     else:
-
-                        actions[a] = 4
+                        # Allow action here
+                        # actions[a] = 4
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
 
                 elif observation_builder.ts+1 >= target_vertex.TrainsTime[agent_pos_id][0]\
                         and conflict_status < 10000:
@@ -883,10 +909,16 @@ def get_action_dict_junc(observation_builder, obs):
                                                next_position,
                                                actions)
                 else:
-                    actions, obs = optimize_and_find_action(actions,
-                                                            obs,
-                                                            observation_builder,
-                                                            a)
+                    # actions, obs = optimize_and_find_action(actions,
+                    #                                         obs,
+                    #                                         observation_builder,
+                    #                                         a)
+                    actions = get_valid_action(observation_builder,
+                                               a,
+                                               cur_position,
+                                               next_position,
+                                               actions)
+
                 if actions[a] != 4 and len(own_deadlocks):
                     for deadlock in own_deadlocks:
                         if deadlock in obs.Deadlocks:
@@ -946,7 +978,12 @@ def optimize_and_find_action(actions, obs, observation_builder, a):
                                    next_position,
                                    actions)
     else:
-        actions[a] = 4
+        # actions[a] = 4
+        actions = get_valid_action(observation_builder,
+                                   a,
+                                   cur_position,
+                                   next_position,
+                                   actions)
 
     return actions, obs
 
