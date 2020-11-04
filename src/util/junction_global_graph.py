@@ -1,7 +1,7 @@
 
 """ ###################### EDGE ####################"""
 import numpy as np
-
+from collections import defaultdict
 
 
 class vertex:
@@ -18,19 +18,32 @@ class vertex:
         self.TrainsTime = []
         self.TrainsDir = []  # 0 = A->B, 1 = B->A
         self.Links = []
+        self.TrainsTraversal = defaultdict(list)
 
-        self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
-        self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
 
-        self.CostPerTrain = []
-        self.DeadlockCostPerTrain = []
+        #self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
+        #self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
 
-        self.CostCollisionLockTotal = 0
-        self.CostDeadLockTotal = 0
+        #self.CostPerTrain = []
+        #self.DeadlockCostPerTrain = []
 
-        self.CostTotal = 0
+        #self.CostCollisionLockTotal = 0
+        #self.CostDeadLockTotal = 0
+
+        #self.CostTotal = 0
 
         self.update_ts = 0
+
+        self.currently_residing_agents = []
+
+        self.is_signal_on = False
+
+        #self.signal_time = 0
+        #self.signal_deadlocks = []
+        self.is_safe = True
+        self.occupancy = 0
+        self.extended_capacity = len(node)
+        self.capacity = len(node)
 
     def __str__(self):
         """
@@ -38,13 +51,14 @@ class vertex:
         :return:
         """
         return 'Type : ' + str(self.Type) \
-               + '; Cost: ' + str(self.CostTotal) \
-               + '; Trains: ' + str(self.Trains)
+                + '; Trains: ' + str(self.Trains) \
+                + '; Safety Status: ' + str(self.is_safe)
+                # + '; Cost: ' + str(self.CostTotal) \
 
     def other_end(self, first):
         return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]
 
-
+    """
     def setCollision(self):
 
         self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
@@ -66,6 +80,7 @@ class vertex:
 
                     if np.any(bitmap[self.TrainsTime[agent_pos_id][0]:self.TrainsTime[agent_pos_id][1]+1] > 0):
                         self.CollisionLockMatrix[agent_pos_id][opp_agent] = 1
+    """
 
 
 
@@ -75,34 +90,52 @@ class vertex:
         :return:
         """
 
-        self.setCollision()
+        #self.setCollision()
 
-        self.CostCollisionLockTotal = 0
-        self.CostTransitionTimeTotal = 0
-        self.CostDeadLockTotal = 0
-        self.CostTotal = 0
-        self.CostPerTrain = []
-        self.DeadlockCostPerTrain = []
+        #self.CostCollisionLockTotal = 0
+        #self.CostTransitionTimeTotal = 0
+        #self.CostDeadLockTotal = 0
+        #self.CostTotal = 0
+        #self.CostPerTrain = []
+        #self.DeadlockCostPerTrain = []
 
-        for agent_pos_id, agent_id in enumerate(self.Trains):
+        #if self.signal_time > 1:
+        #    self.signal_time -= 1
+        #elif self.signal_time == 1:
+        #    self.signal_time -= 1
+        #    self.signal_deadlocks = []
 
-            if self.TrainsTime[agent_pos_id][0] != 0:
-                self.CostPerTrain.append(
-                            abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
-                            + np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 10000)
+        start_times = [item[0] for item in self.TrainsTime]
 
-                self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[agent_pos_id]) * 5000
+        if np.max(start_times) == 0:
+            self.is_safe = True
+        else:
+            self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
 
-            else:
-                self.CostPerTrain.append(abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0]))
+    def setExtendedCapacity(self):
+        """
 
+        :return:
+        """
 
-            self.CostDeadLockTotal += np.count_nonzero(self.DeadLockMatrix[agent_id]) * 50000
-            self.DeadlockCostPerTrain.append(np.count_nonzero(self.DeadLockMatrix[agent_id]) * 100000)
+        if self.is_safe:
+            pending_to_explore = []
+            explored = []
+            explored.append(self.id)
+            for vertex in self.Links:
+                if vertex[1].is_safe:
+                    pending_to_explore.append(vertex[1])
 
-            self.CostTransitionTimeTotal += abs(self.TrainsTime[agent_pos_id][1] - self.TrainsTime[agent_pos_id][0])
+            capacity = 0
+            while len(pending_to_explore):
+                vertex = pending_to_explore.pop()
+                explored.append(vertex.id)
+                capacity += len(vertex.Cells)
+                for next_vertex in vertex.Links:
+                    if next_vertex[1].is_safe and next_vertex[1].id not in explored:
+                        pending_to_explore.append(next_vertex[1])
 
-        self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal + self.CostDeadLockTotal
+            self.extended_capacity = self.capacity + capacity
 
 
 class Global_Graph:
@@ -129,13 +162,17 @@ class Global_Graph:
 
         :return:
         """
-        cost = 0
+        #cost = 0
         for vertex in self.vertices:
             if len(self.vertices[vertex].Trains):
                 self.vertices[vertex].setCosts()
-            cost += self.vertices[vertex].CostTotal
+            #cost += self.vertices[vertex].CostTotal
 
-        self.CostTotalEnv = cost
+        for vertex in self.vertices:
+            if len(self.vertices[vertex].Trains):
+                self.vertices[vertex].setExtendedCapacity()
+
+        #self.CostTotalEnv = cost
 
 
     def add_edge_vertex(self, type, cells):
