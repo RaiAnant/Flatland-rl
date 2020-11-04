@@ -21,11 +21,12 @@ from src.util.tree_builder import Agent_Tree
 from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
-from src.optimizer import get_action_dict_junc, optimize
+from src.optimizer import get_action_dict_safety, optimize
 
 import cv2
 
 if __name__ == "__main__":
+
     # NUMBER_OF_AGENTS = 10
     # width = 30
     # height = 30
@@ -44,11 +45,13 @@ if __name__ == "__main__":
     # max_prediction_depth = 200
     # NUM_CITIES = 5
 
-    NUMBER_OF_AGENTS = 100
+    NUMBER_OF_AGENTS = 200
     width = 35
     height = 35
     max_prediction_depth = 200
     NUM_CITIES = 4
+
+    SIGNAL_TIMER = 2
 
     find_alternate_paths = True
     rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
@@ -117,45 +120,17 @@ if __name__ == "__main__":
         observation_builder.observations.setCosts()
         obs = observation_builder.observations
 
-    for step in range(8 * (width + height + 20)):
+    for step in range(20 * (width + height + 20)):
+
 
         print("==================== ", step)
 
-        obs.Deadlocks = conflict_data
-
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        observation_builder.setDeadLocks(obs)
-        obs.setCosts()
-        obs_list.append(obs_temp)
-        # obs = optimize(observation_builder, obs, "edge")
-        # obs = optimize(observation_builder, obs, "junction")
-
-        # obs = optimize(observation_builder, obs, "edge")
-        # obs_temp = copy.deepcopy(obs)
-        # obs_list.append(obs_temp)
-        # obs = optimize(observation_builder, obs, "junction")
-        # obs_temp = copy.deepcopy(obs)
-        # obs_list.append(obs_temp)
-
-        conflict_data = obs.Deadlocks
-        """
-        obs = optimize(observation_builder, obs, "edge")
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        obs = optimize(observation_builder, obs, "junction")
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
-        """
-
-        _action, obs = get_action_dict_junc(observation_builder, obs)
+        _action = get_action_dict_safety(observation_builder, SIGNAL_TIMER)
 
         obs_temp = copy.deepcopy(obs)
         obs_list.append(obs_temp)
 
         next_obs, all_rewards, done, _ = env.step(_action)
-
-        # print("Rewards: {}, [done={}]".format(all_rewards, done))
 
         img = env_renderer.render_env(show=True,
                                       show_inactive_agents=False,
@@ -166,7 +141,6 @@ if __name__ == "__main__":
 
         cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
 
-        # time.sleep(1.0)
 
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:

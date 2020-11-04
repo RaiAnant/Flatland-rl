@@ -151,40 +151,31 @@ def optimize(observation_builder, obs, node_type="edge"):
             #trains = observations.vertices[vert].Trains
             inner_observation_structure = []
 
-            candidate_trains = []
+            # candidate_trains = []
+            # candidate_trains_1 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                     if observations.vertices[vert].DeadlockCostPerTrain[id] > 0 ]
+            # candidate_trains_2 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
+            #                     if observations.vertices[vert].CostPerTrain[id] > 10000]
+            # if len(candidate_trains_1) and len(candidate_trains_2):
+            #     candidate_trains = candidate_trains_1 + candidate_trains_2
+            # elif len(candidate_trains_1):
+            #     candidate_trains = candidate_trains_1
+            # elif len(candidate_trains_2):
+            #     candidate_trains = candidate_trains_2
+
+            candidate_trains = [[id, agent_id]
+                                for id, agent_id in enumerate(observations.vertices[vert].Trains)
+                                if observations.vertices[vert].CostPerTrain[id] > 10000]
 
             #max_cost = np.max(observations.vertices[vert].CostPerTrain)
-
-            candidate_trains_1 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].DeadlockCostPerTrain[id] > 0 ]
-
-
-            candidate_trains_2 = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].CostPerTrain[id] > 10000]
-
-            if len(candidate_trains_1) and len(candidate_trains_2):
-                candidate_trains = candidate_trains_1 + candidate_trains_2
-            elif len(candidate_trains_1):
-                candidate_trains = candidate_trains_1
-            elif len(candidate_trains_2):
-                candidate_trains = candidate_trains_2
-
-            candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-                                if observations.vertices[vert].CostPerTrain[id] > 10000]
-
-
-            #elif max_cost >= 10000:
-            #    candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-            #                        if observations.vertices[vert].CostPerTrain[id] >= 10000
-            #                        and observations.vertices[vert].DeadlockCostPerTrain[id] == 0]
-
-            #candidate_trains = [[id, agent_id] for id, agent_id in enumerate(observations.vertices[vert].Trains)
-            #                        if 10000 < observations.vertices[vert].CostPerTrain[id] < 100000]
 
             for candidate in candidate_trains:
 
                 id = candidate[0]
                 agent_id = candidate[1]
+
+                #if observations.vertices[vert].CostPerTrain[id] != max_cost:
+                #    continue
 
                 observations = copy.deepcopy(obs)
                 vertex = observations.vertices[vert]
@@ -246,6 +237,10 @@ def optimize(observation_builder, obs, node_type="edge"):
                             inner_observation_structure.append([observations.CostTotalEnv, observations])
 
                             break
+
+
+                    #if observations.CostTotalEnv < obs.CostTotalEnv:
+                    #    obs = observations
 
             if len(inner_observation_structure) > 1:
                 sorted_cost_list = sorted(inner_observation_structure, key=lambda x: x[0], reverse=False)
@@ -388,62 +383,229 @@ def get_action_dict(observation_builder, observations):
     return actions
 
 
-    """
-    candidate_edges = [edge for edge in observations.edge_ids if len(edge.Trains) > 0]
-    for edge in candidate_edges:
-        for a in next_pos:
-            if a in edge.Trains:
-                if next_pos[a][0] in edge.Cells and next_pos[a][1] in edge.Cells:
+def agent_clipping(observation_builder):
+
+    priority = defaultdict()
+    clipped_agents = defaultdict(list)
+
+    for num, item in enumerate(observation_builder.cur_pos_list):
+        clipped_agents[num] = []
+        priority[num] = 0
+
+        for num_other, item_other in enumerate(observation_builder.cur_pos_list):
+            if num != num_other:
+                # check if they have teh same conflict and opening,
+                # and they are unit distance apart
+                # clip them together
+                if item[3] == item_other[3] and len(item[3])\
+                        and pow((item[0][0]-item_other[0][0]), 2)\
+                        + pow((item[0][1]-item_other[0][1]), 2) < 2:
+                    priority[num] += 1
+                    clipped_agents[num].append(num_other)
+
+    # final_priority = defaultdict()
+    # final_clipped_agents = defaultdict(list)
+    #
+    # for num, item in enumerate(observation_builder.cur_pos_list):
+    #     if item[2]:
+    #         final_priority[num] = priority[num]
+    #         final_clipped_agents[num] = clipped_agents[num]
+    #
+    # for waiting_agent in final_clipped_agents:
+    #     if len(final_clipped_agents[waiting_agent]):
+    #         print("here")
 
 
 
-    candidate_edges = [edge for edge in observations.edge_ids if len(edge.Trains) > 0]
-    for edge in candidate_edges:
-        for a in next_pos:
-            if a in edge.Trains:
-                if next_pos[a][0] in edge.Cells and next_pos[a][1] in edge.Cells:
 
-                    cur_position = next_pos[a][0]
-                    next_position = next_pos[a][1]
 
-                    #id = [num for num, item in enumerate(edge.Trains) if item == a][0]
+    return priority, clipped_agents
 
-                    # now either the train is leaving
-                    if (next_pos[a][1] == edge.Cells[0] or next_pos[a][1] == edge.Cells[-1]) and observation_builder.ts <= edge.TrainsTime[id][1]+2:
+def get_action_dict_safety(observation_builder, signal_timer):
+
+    actions = defaultdict()
+    blocked_edges = []
+
+    # nothing should stop movement in safe zone
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            # if clear priority
+            if observation_builder.cur_pos_list[a][4]:
+
+                # if next is safe
+                # whether current is unsafe or safe
+                cur_position = observation_builder.cur_pos_list[a][0]
+                next_position = observation_builder.cur_pos_list[a][1]
+
+                actions = get_valid_action(observation_builder,
+                                           a,
+                                           cur_position,
+                                           next_position,
+                                           actions)
+
+                if len(observation_builder.cur_pos_list[a][3]):
+                    # if not on safe edge already
+                    # set all the remaining edges as blocked
+                    if not observation_builder.cur_pos_list[a][5]:
+                        # set claim on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
+
+    # allow actions based on junctions data
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            # if entering unsafe zone
+            if observation_builder.cur_pos_list[a][2]:
+
+                # if the entry junction is already entered by any agent before
+                if observation_builder.cur_pos_list[a][3][0].id in observation_builder.signal_time.keys():
+
+                    # if the timer set by the agent hasn't expired
+                    if observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] > 0:
+
+                        # if their deadlock zone have same length
+                        # if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
+                        #         == len(observation_builder.cur_pos_list[a][3]):
+                        #     equal_status = [0 if item1.id == item2.id else 1 for item1,item2 in
+                        #                     zip(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id],
+                        #                         observation_builder.cur_pos_list[a][3])]
+                        #
+                        #     # if they are all the same in the same order
+                        #     if not np.count_nonzero(equal_status):
+                        # if their deadlock zone have same length
+                        if len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id]) \
+                                and len(observation_builder.cur_pos_list[a][3]):
+
+                            num = 0
+                            blocked = False
+                            while True:
+                                if observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id][num].id != \
+                                        observation_builder.cur_pos_list[a][3][num].id:
+                                    blocked = True
+                                    break
+
+                                num += 1
+                                if num >= len(observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id])-1\
+                                        or num >= len(observation_builder.cur_pos_list[a][3])-1:
+                                    break
+
+                            # if they are all the same in the same order
+                            if not blocked:
+
+                                # if the capacity of exit vertex is not already full
+                                # or it is a target vertex
+                                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0 or \
+                                        observation_builder.cur_pos_list[a][3][-1].TrainsTraversal[a][1] == None:
+                                    cur_position = observation_builder.cur_pos_list[a][0]
+                                    next_position = observation_builder.cur_pos_list[a][1]
+
+                                    actions = get_valid_action(observation_builder,
+                                                               a,
+                                                               cur_position,
+                                                               next_position,
+                                                               actions)
+
+                                    # set claim on exit cell
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                    # add all unsafe edges on teh way to global block list
+                                    for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                                        if edge not in blocked_edges:
+                                            blocked_edges.append(edge)
+
+                                    # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                                    observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                                    # because the agent is allowed
+                                    # it should set occupancy on the exit cell
+                                    observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                                    # it should also set on the junction,
+                                    # the list of vertices which are blocked for this agent
+                                    observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                                    # and the number of timesteps it should wait and
+                                    # see if another agent is going in the same direction
+                                    observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
+
+
+    # decrement signal timers as the decision based on junction data is taken
+    for item in observation_builder.signal_time:
+        if observation_builder.signal_time[item] > 0:
+            observation_builder.signal_time[item] -= 1
+        else:
+            observation_builder.observations.vertices[item].is_signal_on = False
+
+    # Fresh entry in unsafe zone
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            # if entering unsafe zone
+            if observation_builder.cur_pos_list[a][2]:
+
+                # if no place left after real agents at the exit section or existing claims to exit section
+                if observation_builder.cur_pos_list[a][3][-1].extended_capacity - \
+                        observation_builder.cur_pos_list[a][3][-1].occupancy > 0:
+                    blocked = False
+                    for transit_edge in observation_builder.cur_pos_list[a][3][:-1]:
+
+                        # if edge not blocked
+                        if transit_edge in blocked_edges:
+                            blocked = True
+                            break
+                        # if no signal is on in opposite direction
+                        if transit_edge.is_signal_on:
+                            blocked = True
+                            break
+
+                    if blocked:
                         actions[a] = 4
-                    # or it is entering or normally travelling
                     else:
+                        cur_position = observation_builder.cur_pos_list[a][0]
+                        next_position = observation_builder.cur_pos_list[a][1]
 
-                        cur_direction = observation_builder.env.agents[a].direction
-                        if cur_position[0] == next_position[0]:
-                            if cur_position[1] > next_position[1]:
-                                next_direction = 3
-                            elif cur_position[1] < next_position[1]:
-                                next_direction = 1
-                            else:
-                                next_direction = cur_direction
-                        elif cur_position[1] == next_position[1]:
-                            if cur_position[0] > next_position[0]:
-                                next_direction = 0
-                            elif cur_position[0] < next_position[0]:
-                                next_direction = 2
-                            else:
-                                next_direction = cur_direction
+                        actions = get_valid_action(observation_builder,
+                                                   a,
+                                                   cur_position,
+                                                   next_position,
+                                                   actions)
 
-                        if (cur_direction + 1) % 4 == next_direction:
-                            actions[a] = 3
-                        elif (cur_direction - 1) % 4 == next_direction:
-                            actions[a] = 1
-                        elif next_direction == cur_direction:
-                            actions[a] = 2
-                        else:
-                            print("Bug")
+                        # add all unsafe edges on teh way to global block list
+                        for edge in observation_builder.cur_pos_list[a][3][:-1]:
+                            if edge not in blocked_edges:
+                                blocked_edges.append(edge)
 
-    print(actions)
+                        # set a bit to tell everyone trying for a simple entry that this junction is set on in one direction
+                        observation_builder.cur_pos_list[a][3][0].is_signal_on = True
+                        # because the agent is allowed
+                        # it should set occupancy on the exit cell
+                        observation_builder.cur_pos_list[a][3][-1].occupancy += 1
+                        # it should also set on the junction,
+                        # the list of vertices which are blocked for this agent
+                        observation_builder.signal_deadlocks[observation_builder.cur_pos_list[a][3][0].id] = observation_builder.cur_pos_list[a][3]
+                        # and the number of timesteps it should wait and
+                        # see if another agent is going in the same direction
+                        observation_builder.signal_time[observation_builder.cur_pos_list[a][3][0].id] = signal_timer
+                else:
+                    actions[a] = 4
+
+    # set everything else to halt
+    for a, row in enumerate(observation_builder.cur_pos_list):
+
+        # not already decided
+        if a not in actions.keys():
+
+            actions[a] = 4
+
     return actions
-
-"""
-
 
 
 def get_action_dict_junc(observation_builder, obs):
@@ -461,16 +623,14 @@ def get_action_dict_junc(observation_builder, obs):
         cur_position = observation_builder.cur_pos_list[a][0]
         next_position = observation_builder.cur_pos_list[a][1]
 
-        #if the next position is already occupied then no action
-
-        next_pos_occupied = [num for num,item in enumerate(observation_builder.cur_pos_list)
-                             if next_position[0] == item[0][0]
-                             and next_position[1] == item[0][1]
-                             and next_position[0] != observation_builder.env.agents[a].target[0]
-                             and next_position[1] != observation_builder.env.agents[a].target[1]]
-
-
         if next_position != tuple((0,0)):
+
+            # if the next position is already occupied then no action
+            next_pos_occupied = [num for num, item in enumerate(observation_builder.cur_pos_list)
+                                 if next_position[0] == item[0][0]
+                                 and next_position[1] == item[0][1]
+                                 and next_position[0] != observation_builder.env.agents[a].target[0]
+                                 and next_position[1] != observation_builder.env.agents[a].target[1]]
 
             if len(next_pos_occupied):
                 # Allow action here
@@ -482,6 +642,7 @@ def get_action_dict_junc(observation_builder, obs):
                                            actions)
 
             elif observation_builder.cur_pos_list[a][2]:
+
                 # check first if the agent is allowed to move to the junction
                 current_vertex = [obs.vertices[item]
                                   for item in obs.vertices
@@ -503,6 +664,31 @@ def get_action_dict_junc(observation_builder, obs):
                                                next_position,
                                                actions)
                     continue
+
+
+                # check if capacity on the next safe section
+                if not target_edge_vertex[0].is_safe:
+                    current_vertex = copy.deepcopy(target_vertex)
+                    target_safe_vertex = copy.deepcopy(target_edge_vertex)
+
+                    # next safe edge and if it is free
+                    while True:
+                        if not target_safe_vertex[0].is_safe:
+                            # find next
+                            temp = [item[1] for item in target_safe_vertex[0].Links if a in item[1].Trains
+                                              and item[1] != current_vertex]
+                            current_vertex = target_safe_vertex[0]
+                            target_safe_vertex = temp
+                        else:
+                            break
+                else:
+                    target_safe_vertex = copy.deepcopy(target_edge_vertex)
+
+                # if no capacity on next safe edge the send stop signal
+                if target_safe_vertex[0].extended_capacity <= target_safe_vertex[0].occupancy:
+                    actions[a] = 4
+                    continue
+
 
                 agent_pos_target_edge_vertex = [num for num, item in enumerate(target_edge_vertex[0].Trains)
                                                 if item == a]
