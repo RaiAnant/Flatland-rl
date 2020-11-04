@@ -178,6 +178,9 @@ class GraphObsForRailEnv(ObservationBuilder):
                             print("problem")
 
                         while True:
+                            if next_vertex == None:
+                                break
+
                             if next_vertex.is_safe:
                                 vert_list.append(next_vertex)
                                 break
@@ -341,7 +344,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                         if agent_next_position == None and agent_prev_vertex == None:
                             print("here")
 
+                        agent_current_vertex.Trains.append(a)
+                        agent_current_vertex.TrainsDir.append(-1)
                         agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
+                        agent_current_vertex.TrainsTime.append([start_timestamp, start_timestamp+1])
 
                         break
 
@@ -399,7 +405,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                         if agent_next_position == None and agent_prev_vertex == None:
                             print("here")
 
+                        agent_current_vertex.Trains.append(a)
+                        agent_current_vertex.TrainsDir.append(-1)
                         agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
+                        agent_current_vertex.TrainsTime.append([start_timestamp, start_timestamp+1])
 
                         break
 
