@@ -3,7 +3,7 @@ import time
 from flatland.envs.rail_generators import complex_rail_generator
 
 from flatland.envs.schedule_generators import complex_schedule_generator
-from src.util.custom_rail_env  import RailEnv
+from src.util.custom_rail_env import RailEnv
 from flatland.utils.rendertools import RenderTool
 from flatland.envs.observations import GlobalObsForRailEnv
 from flatland.envs.malfunction_generators import malfunction_from_params
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # max_prediction_depth = 200
     # NUM_CITIES = 5
 
-    NUMBER_OF_AGENTS = 200
+    NUMBER_OF_AGENTS = 50
     width = 35
     height = 35
     max_prediction_depth = 200
@@ -92,6 +92,9 @@ if __name__ == "__main__":
                                   return_image=True)
     if find_alternate_paths:
         for idx, agent in enumerate(env.agents):
+            Agent_Tree.starting_points.append(agent.initial_position)
+
+        for idx, agent in enumerate(env.agents):
             tree = Agent_Tree(idx, agent.initial_position)
             tree.build_tree(obs, env)
             tree_dict[idx] = tree
@@ -106,7 +109,11 @@ if __name__ == "__main__":
                 observation_builder.cells_sequence[idx].append(temp_node.node_id)
                 observation_builder.cells_sequence[idx] += temp_node.path
                 # TODO: will have to adjust this when cases with more than 2 children come
-                if len(temp_node.children) > 1 and temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost:
+                if len(temp_node.children) > 1 and \
+                        (temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost or
+                         temp_node.children[0].contains_starting_pos) and \
+                        not temp_node.children[1].contains_starting_pos:
+
                     print(idx, temp_node.children[0].node_id, temp_node.children[0].min_flow_cost,
                           temp_node.children[1].min_flow_cost)
                     temp_node = temp_node.children[1]
@@ -116,12 +123,12 @@ if __name__ == "__main__":
             observation_builder.cells_sequence[idx].append(agent.target)
             observation_builder.cells_sequence[idx].append((0, 0))
 
-        observation_builder.observations = observation_builder.populate_graph(copy.deepcopy(observation_builder.base_graph))
+        observation_builder.observations = observation_builder.populate_graph(
+            copy.deepcopy(observation_builder.base_graph))
         observation_builder.observations.setCosts()
         obs = observation_builder.observations
 
     for step in range(20 * (width + height + 20)):
-
 
         print("==================== ", step)
 
@@ -140,7 +147,6 @@ if __name__ == "__main__":
                                       return_image=True)
 
         cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
-
 
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:

@@ -178,6 +178,10 @@ class GraphObsForRailEnv(ObservationBuilder):
                             print("problem")
 
                         while True:
+                            # if next_pos == (22, 23) and cur_pos == (23, 23) and a.handle == 24:
+                            #     print("Debug")
+                            if next_vertex is None:
+                                break
                             if next_vertex.is_safe:
                                 vert_list.append(next_vertex)
                                 break
