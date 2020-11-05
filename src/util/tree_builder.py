@@ -1,5 +1,6 @@
 from flatland.core.grid.grid4_utils import get_new_position, get_direction
 import numpy as np
+import copy
 
 
 class Node():
@@ -50,7 +51,6 @@ class Agent_Tree():
         self.starting_pos = starting_pos
 
         self.avoid_starting_pos = avoid_starting_pos
-
 
         self.root = None  # root of the tree
         self.node_maps = {}
@@ -213,7 +213,7 @@ class Agent_Tree():
                         if start != idx:
 
                             edge, dir = (
-                            obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1])], 1) \
+                                obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1])], 1) \
                                 if self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1]) in obs.vertices else \
                                 (obs.vertices[self.idx(node.path[idx - 1]) + "," + self.idx(node.path[start])], 0)
 
@@ -320,3 +320,43 @@ class Agent_Tree():
 
         if self.root.min_flow_cost is None:
             self.get_cost_of_traversal(self.root, obs)
+
+
+def optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder):
+    for idx, agent in enumerate(env.agents):
+        Agent_Tree.starting_points.append(agent.initial_position)
+
+    for idx, agent in enumerate(env.agents):
+        tree = Agent_Tree(idx, agent.initial_position)
+        tree.build_tree(obs, env)
+        tree_dict[idx] = tree
+
+        tree.optimize_path(obs)
+        root = tree.root
+
+        temp_node = root
+        observation_builder.cells_sequence[idx] = []
+
+        while temp_node:
+            observation_builder.cells_sequence[idx].append(temp_node.node_id)
+            observation_builder.cells_sequence[idx] += temp_node.path
+            # TODO: will have to adjust this when cases with more than 2 children come
+            if len(temp_node.children) > 1 and \
+                    (temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost or
+                     temp_node.children[0].contains_starting_pos) and \
+                    not temp_node.children[1].contains_starting_pos:
+
+                print(idx, temp_node.children[0].node_id, temp_node.children[0].min_flow_cost,
+                      temp_node.children[1].min_flow_cost)
+                temp_node = temp_node.children[1]
+            else:
+                temp_node = temp_node.children[0] if temp_node.children != [] else None
+
+        observation_builder.cells_sequence[idx].append(agent.target)
+        observation_builder.cells_sequence[idx].append((0, 0))
+
+    observation_builder.observations = observation_builder.populate_graph(
+        copy.deepcopy(observation_builder.base_graph))
+    observation_builder.observations.setCosts()
+    obs = observation_builder.observations
+    return obs

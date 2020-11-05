@@ -22,6 +22,11 @@ from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
 from src.optimizer import get_action_dict_safety, optimize
+from src.util.tree_builder import optimize_all_agent_paths_for_min_flow_cost
+from flatland.envs.rail_generators import rail_from_file
+from flatland.envs.schedule_generators import schedule_from_file
+from flatland.core.env_observation_builder import DummyObservationBuilder
+from flatland.envs.malfunction_generators import malfunction_from_file
 
 import cv2
 
@@ -63,28 +68,44 @@ if __name__ == "__main__":
 
     SIGNAL_TIMER = 2
 
+    test_env_file_path = '/home/anant/Projects/flatland-challenge-starter-kit-master/scratch/test-envs/Test_0/Level_0.pkl'
+
     find_alternate_paths = True
-    rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
-                                           grid_mode=False,
-                                           max_rails_between_cities=3,
-                                           max_rails_in_city=4,
-                                           seed=1500)
 
     observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=max_prediction_depth),
                                              bfs_depth=200)
 
-    env = RailEnv(
-        width=width, height=height,
-        rail_generator=rail_generator,
-        obs_builder_object=observation_builder,
-        schedule_generator=sparse_schedule_generator(),
-        number_of_agents=NUMBER_OF_AGENTS,
-        remove_collisions=True
-    )
+    if test_env_file_path:
+        env = RailEnv(width=1, height=1, rail_generator=rail_from_file(test_env_file_path),
+                      schedule_generator=schedule_from_file(test_env_file_path),
+                      malfunction_generator_and_process_data=malfunction_from_file(test_env_file_path),
+                      obs_builder_object=observation_builder)
+
+        obs, _ = env.reset()
+
+        width = env.width
+        height = env.height
+        NUMBER_OF_AGENTS = env.number_of_agents
+    else:
+        rail_generator = sparse_rail_generator(max_num_cities=NUM_CITIES,
+                                               grid_mode=False,
+                                               max_rails_between_cities=3,
+                                               max_rails_in_city=4,
+                                               seed=1500)
+        env = RailEnv(
+            width=width, height=height,
+            rail_generator=rail_generator,
+            obs_builder_object=observation_builder,
+            schedule_generator=sparse_schedule_generator(),
+            number_of_agents=NUMBER_OF_AGENTS,
+            remove_collisions=True
+        )
+        obs, _ = env.reset()
+
+
+
 
     env_renderer = RenderTool(env)
-    obs, _ = env.reset()
-
     obs_list = []
 
     conflict_data = []
@@ -92,7 +113,6 @@ if __name__ == "__main__":
     # obs_temp = copy.deepcopy(obs)
 
     tree_dict = {}
-    agent_idx = {}
 
     img = env_renderer.render_env(show=True,
                                   show_inactive_agents=False,
@@ -101,42 +121,7 @@ if __name__ == "__main__":
                                   frames=True,
                                   return_image=True)
     if find_alternate_paths:
-        for idx, agent in enumerate(env.agents):
-            Agent_Tree.starting_points.append(agent.initial_position)
-
-        for idx, agent in enumerate(env.agents):
-            tree = Agent_Tree(idx, agent.initial_position)
-            tree.build_tree(obs, env)
-            tree_dict[idx] = tree
-            agent_idx[idx] = 0
-            tree.optimize_path(obs)
-            root = tree.root
-
-            temp_node = root
-            observation_builder.cells_sequence[idx] = []
-
-            while temp_node:
-                observation_builder.cells_sequence[idx].append(temp_node.node_id)
-                observation_builder.cells_sequence[idx] += temp_node.path
-                # TODO: will have to adjust this when cases with more than 2 children come
-                if len(temp_node.children) > 1 and \
-                        (temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost or
-                         temp_node.children[0].contains_starting_pos) and \
-                        not temp_node.children[1].contains_starting_pos:
-
-                    print(idx, temp_node.children[0].node_id, temp_node.children[0].min_flow_cost,
-                          temp_node.children[1].min_flow_cost)
-                    temp_node = temp_node.children[1]
-                else:
-                    temp_node = temp_node.children[0] if temp_node.children != [] else None
-
-            observation_builder.cells_sequence[idx].append(agent.target)
-            observation_builder.cells_sequence[idx].append((0, 0))
-
-        observation_builder.observations = observation_builder.populate_graph(
-            copy.deepcopy(observation_builder.base_graph))
-        observation_builder.observations.setCosts()
-        obs = observation_builder.observations
+        obs = optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder)
 
     for step in range(20 * (width + height + 20)):
 
