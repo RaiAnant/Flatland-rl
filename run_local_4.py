@@ -26,6 +26,16 @@ from src.optimizer import get_action_dict_safety, optimize
 import cv2
 
 if __name__ == "__main__":
+    NUMBER_OF_AGENTS = 200
+    width = 35
+    height = 35
+    max_prediction_depth = 300
+    NUM_CITIES = 3
+    SIGNAL_TIMER = 2
+    # problem
+    # NUMBER_OF_AGENTS = 100
+    # width = 25
+    # height = 25
 
     # NUMBER_OF_AGENTS = 10
     # width = 30

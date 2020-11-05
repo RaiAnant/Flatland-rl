@@ -105,12 +105,15 @@ class vertex:
         #    self.signal_time -= 1
         #    self.signal_deadlocks = []
 
-        start_times = [item[0] for item in self.TrainsTime]
+        # start_times = [item[0] for item in self.TrainsTime]
+        # agent_dirs = np.unique(self.TrainsDir)
+        # if np.max(start_times) == 0:
+        #     self.is_safe = True
+        # else:
+        #     self.is_safe = True if len(agent_dirs) <= 1 else False
 
-        if np.max(start_times) == 0:
-            self.is_safe = True
-        else:
-            self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
+        self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
+
 
     def setExtendedCapacity(self):
         """
