@@ -11,6 +11,7 @@ class Node():
         self.dist = 0
         self.is_blocked = False
         self.min_flow_cost = None
+        self.contains_starting_pos = False
 
     def get_cost(self, node):
         return node.cost
@@ -42,11 +43,14 @@ def find_new_direction(direction, action):  # returns new direction after taking
 
 class Agent_Tree():
     tree_map = {}  # stores the tree  for given starting and ending positions so new tree need not be calculated for the same routes
+    starting_points = []
 
-    def __init__(self, agent_no, starting_pos):
+    def __init__(self, agent_no, starting_pos, avoid_starting_pos=True):
         self.agent_no = agent_no
         self.starting_pos = starting_pos
-        # self.current_pos = starting_pos
+
+        self.avoid_starting_pos = avoid_starting_pos
+
 
         self.root = None  # root of the tree
         self.node_maps = {}
@@ -112,12 +116,15 @@ class Agent_Tree():
                     node.add_cell_to_path(pos)
 
                 # calculate new position and direction
+                if pos in Agent_Tree.starting_points:
+                    node.contains_starting_pos = True
                 dir = np.argmax(possible_transitions)
                 pos = get_new_position(pos, dir)
 
                 continue
 
-            elif (pos[0], pos[1], dir) not in hash.keys():  # a node/fork has been reached, if the pos and direction exisits in has, it means this node has already been visited and is a loops
+            elif (pos[0], pos[1],
+                  dir) not in hash.keys():  # a node/fork has been reached, if the pos and direction exisits in has, it means this node has already been visited and is a loops
 
                 notLoop = False  # var to check for loops in tree
                 hash[(pos[0], pos[1], dir)] = 1  # marking the point as visited to avoid loops later
@@ -136,7 +143,8 @@ class Agent_Tree():
                     if pos[0] == 12 and pos[1] == 5 and dir == 0:
                         print("at the node for debug")
 
-                    if transitions[idx][0] - transitions[0][0] > 51:  # if the current transition leads to a cost 40 greater than the first transtion (with the least cost), avoid it
+                    if transitions[idx][0] - transitions[0][
+                        0] > 51:  # if the current transition leads to a cost 40 greater than the first transtion (with the least cost), avoid it
                         break
 
                     new_node = Node(pos, [])  # node for the new transition
@@ -179,8 +187,8 @@ class Agent_Tree():
                     if self.idx(node.path[0]) + "," + self.idx(node.path[-1]) in obs.vertices else \
                     (obs.vertices[self.idx(node.path[-1]) + "," + self.idx(node.path[0])], 0)
 
-                if node.path[0]==node.path[-1]:
-                    dir = 1 if edge.Links[0][1].Cells[0]==node.node_id else 0
+                if node.path[0] == node.path[-1]:
+                    dir = 1 if edge.Links[0][1].Cells[0] == node.node_id else 0
 
                 no_of_one_dir_agents = sum(edge.TrainsDir)
 
@@ -192,9 +200,9 @@ class Agent_Tree():
                 if flow != dir:
                     cost += no_of_one_dir_agents * len(edge.Cells) if flow is 1 else (len(
                         edge.TrainsDir) - no_of_one_dir_agents) * len(edge.Cells)
-                    cost+=1
+                    cost += 1
                 else:
-                    cost += len(edge.Cells)+1
+                    cost += len(edge.Cells) + 1
             except KeyError:
 
                 start = 0
@@ -202,16 +210,17 @@ class Agent_Tree():
 
                     if self.idx(cell) in obs.vertices:
 
-                        if start!=idx:
+                        if start != idx:
 
-                            edge, dir = (obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx-1])], 1) \
-                                if self.idx(node.path[start]) + "," + self.idx(node.path[idx-1]) in obs.vertices else \
-                                (obs.vertices[self.idx(node.path[idx-1]) + "," + self.idx(node.path[start])], 0)
+                            edge, dir = (
+                            obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1])], 1) \
+                                if self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1]) in obs.vertices else \
+                                (obs.vertices[self.idx(node.path[idx - 1]) + "," + self.idx(node.path[start])], 0)
 
-                            if node.path[start] == node.path[idx-1]:
+                            if node.path[start] == node.path[idx - 1]:
                                 prev_node = node.node_id
                                 if start is not 0:
-                                    prev_node = node.path[start-1]
+                                    prev_node = node.path[start - 1]
 
                                 dir = 1 if edge.Links[0][1].Cells[0] == prev_node else 0
 
@@ -227,21 +236,21 @@ class Agent_Tree():
                                     edge.TrainsDir) - no_of_one_dir_agents) * len(edge.Cells)
                                 cost += 1
                             else:
-                                cost += len(edge.Cells)+1
+                                cost += len(edge.Cells) + 1
 
                         else:
-                            cost+=1
+                            cost += 1
 
-                        start = idx+1
+                        start = idx + 1
 
                 l = None
-                if len(node.children)==0:
+                if len(node.children) == 0:
                     if start == 0:
                         idx = self.idx(node.node_id)
                         next = node.path[0]
                         l = len(node.path)
                     else:
-                        idx = self.idx(node.path[start-1])
+                        idx = self.idx(node.path[start - 1])
                         next = node.path[start]
                         l = len(node.path[start:])
 
@@ -250,13 +259,12 @@ class Agent_Tree():
                             edge = link[1]
                             dir = 1 if next == edge.Cells[0] else 0
 
-                            if len(edge.Cells)==1:
+                            if len(edge.Cells) == 1:
                                 prev_node = node.node_id
                                 if start is not 0:
                                     prev_node = node.path[start - 1]
 
                                 dir = 1 if edge.Links[0][1].Cells[0] == link[0] else 0
-
 
                             no_of_one_dir_agents = sum(edge.TrainsDir)
                             break
@@ -266,8 +274,6 @@ class Agent_Tree():
                     edge, dir = (obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[-1])], 1) \
                         if self.idx(node.path[start]) + "," + self.idx(node.path[-1]) in obs.vertices else \
                         (obs.vertices[self.idx(node.path[-1]) + "," + self.idx(node.path[start])], 0)
-
-
 
                     if node.path[start] == node.path[-1]:
                         prev_node = node.node_id
@@ -280,7 +286,7 @@ class Agent_Tree():
                     l = len(node.path[start:])
 
                 else:
-                    cost+=1
+                    cost += 1
 
                 if l is not None:
                     if len(edge.TrainsDir) != 0:
@@ -291,11 +297,11 @@ class Agent_Tree():
                     if flow != dir:
                         cost += no_of_one_dir_agents * l if flow is 1 else (len(
                             edge.TrainsDir) - no_of_one_dir_agents) * l
-                        cost+=1
+                        cost += 1
                     else:
-                        cost += l+1
+                        cost += l + 1
         else:
-            cost+=1
+            cost += 1
 
         node.flow_cost = cost
 

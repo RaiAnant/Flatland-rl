@@ -23,11 +23,13 @@ import r2_solver
 from src.graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
+from src.optimizer import get_action_dict_safety
+
+
 remote_client = FlatlandRemoteClient()
-os.makedirs("./env_images/", exist_ok=True)
 
 if __name__ == "__main__":
-    max_prediction_depth = 200
+    max_prediction_depth = 400
 
     observation_builder = GraphObsForRailEnv(predictor=ShortestPathPredictorForRailEnv(max_depth=max_prediction_depth),
                                              bfs_depth=max_prediction_depth)
@@ -55,12 +57,10 @@ if __name__ == "__main__":
 
         env_renderer = RenderTool(env)
 
-        os.makedirs("./env_images/"+str(evaluation_number), exist_ok=True)
         while True:
 
             time_start = time.time()
-            obs = observation_builder.optimize(obs)
-            _action = observation_builder.get_action_dict(obs)
+            _action = observation_builder.get_action_dict_safety(obs)
             time_taken = time.time() - time_start
             time_taken_by_controller.append(time_taken)
 
@@ -69,15 +69,6 @@ if __name__ == "__main__":
 
             time_taken = time.time() - time_start
             time_taken_per_step.append(time_taken)
-
-            img = env_renderer.render_env(show=True,
-                                          show_inactive_agents=False,
-                                          show_predictions=True,
-                                          show_observations=True,
-                                          frames=True,
-                                          return_image= True)
-
-            cv2.imwrite("./env_images/"+str(evaluation_number)+"/"+str(steps).zfill(3)+".jpg", img)
 
             obs = next_obs
             steps += 1
@@ -98,3 +89,4 @@ if __name__ == "__main__":
         print("="*100)
 
     print("Evaluation of all environments complete...")
+    print(remote_client.submit())

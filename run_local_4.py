@@ -3,7 +3,7 @@ import time
 from flatland.envs.rail_generators import complex_rail_generator
 
 from flatland.envs.schedule_generators import complex_schedule_generator
-from src.util.custom_rail_env  import RailEnv
+from src.util.custom_rail_env import RailEnv
 from flatland.utils.rendertools import RenderTool
 from flatland.envs.observations import GlobalObsForRailEnv
 from flatland.envs.malfunction_generators import malfunction_from_params
@@ -21,9 +21,19 @@ from src.util.tree_builder import Agent_Tree
 from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
-from src.optimizer import get_action_dict_safety, optimize
+from src.optimizer import get_action_dict_safety
 
 import cv2
+
+import sys
+
+sys.setrecursionlimit(10000)
+
+def sumcs(cell_sequence):
+    sum = 0
+    for item in cell_sequence:
+        sum += len(cell_sequence)
+    return sum
 
 if __name__ == "__main__":
     NUMBER_OF_AGENTS = 200
@@ -55,11 +65,11 @@ if __name__ == "__main__":
     # max_prediction_depth = 200
     # NUM_CITIES = 5
 
-    NUMBER_OF_AGENTS = 200
-    width = 35
-    height = 35
-    max_prediction_depth = 200
-    NUM_CITIES = 4
+    NUMBER_OF_AGENTS = 400
+    width = 150
+    height = 150
+    max_prediction_depth = 400
+    NUM_CITIES = 12
 
     SIGNAL_TIMER = 2
 
@@ -79,13 +89,13 @@ if __name__ == "__main__":
         obs_builder_object=observation_builder,
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=NUMBER_OF_AGENTS,
-        remove_collisions=True
+        remove_collisions=False
     )
 
     env_renderer = RenderTool(env)
     obs, _ = env.reset()
 
-    obs_list = []
+    #obs_list = []
 
     conflict_data = []
 
@@ -102,6 +112,9 @@ if __name__ == "__main__":
                                   return_image=True)
     if find_alternate_paths:
         for idx, agent in enumerate(env.agents):
+            Agent_Tree.starting_points.append(agent.initial_position)
+
+        for idx, agent in enumerate(env.agents):
             tree = Agent_Tree(idx, agent.initial_position)
             tree.build_tree(obs, env)
             tree_dict[idx] = tree
@@ -116,7 +129,11 @@ if __name__ == "__main__":
                 observation_builder.cells_sequence[idx].append(temp_node.node_id)
                 observation_builder.cells_sequence[idx] += temp_node.path
                 # TODO: will have to adjust this when cases with more than 2 children come
-                if len(temp_node.children) > 1 and temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost:
+                if len(temp_node.children) > 1 and \
+                        (temp_node.children[0].min_flow_cost > temp_node.children[1].min_flow_cost or
+                         temp_node.children[0].contains_starting_pos) and \
+                        not temp_node.children[1].contains_starting_pos:
+
                     print(idx, temp_node.children[0].node_id, temp_node.children[0].min_flow_cost,
                           temp_node.children[1].min_flow_cost)
                     temp_node = temp_node.children[1]
@@ -126,19 +143,21 @@ if __name__ == "__main__":
             observation_builder.cells_sequence[idx].append(agent.target)
             observation_builder.cells_sequence[idx].append((0, 0))
 
-        observation_builder.observations = observation_builder.populate_graph(copy.deepcopy(observation_builder.base_graph))
-        observation_builder.observations.setCosts()
+
+        observation_builder.populate_graph()
         obs = observation_builder.observations
+        obs.setCosts()
+        observation_builder.set_agents_state()
+
 
     for step in range(20 * (width + height + 20)):
-
 
         print("==================== ", step)
 
         _action = get_action_dict_safety(observation_builder, SIGNAL_TIMER)
 
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
 
         next_obs, all_rewards, done, _ = env.step(_action)
 
@@ -150,7 +169,6 @@ if __name__ == "__main__":
                                       return_image=True)
 
         cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
-
 
         obs = copy.deepcopy(next_obs)
         if obs is None or done['__all__']:
