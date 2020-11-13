@@ -1,7 +1,9 @@
 from flatland.core.grid.grid4_utils import get_new_position, get_direction
 import numpy as np
 import copy
+import time
 
+TIME_THRESHOLD = 430
 
 class Node():
     def __init__(self, node_id, path=[]):
@@ -57,6 +59,8 @@ class Agent_Tree():
 
     def build_tree(self, obs, env, pos=None, dir=None, node=None, hash=None, i=0):
         # print(i)
+        if time.time() - start_time>TIME_THRESHOLD:
+            return True
 
         agent = env.agents[self.agent_no]
 
@@ -177,6 +181,11 @@ class Agent_Tree():
 
     def get_cost_of_traversal(self, node, obs):
         cost = 0
+
+        if time.time()-start_time > TIME_THRESHOLD:
+            node.min_flow_cost = 1000
+            return 1000
+
         if node.min_flow_cost is not None:
             return node.min_flow_cost
 
@@ -323,17 +332,26 @@ class Agent_Tree():
 
 
 def optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder):
+    global start_time
+    start_time = time.time()
     for idx, agent in enumerate(env.agents):
         Agent_Tree.starting_points.append(agent.initial_position)
 
     for idx, agent in enumerate(env.agents):
+        if time.time()-start_time > TIME_THRESHOLD:
+            break
         tree = Agent_Tree(idx, agent.initial_position)
         tree.build_tree(obs, env)
         tree_dict[idx] = tree
 
+        if time.time()-start_time > TIME_THRESHOLD:
+            break
+
         tree.optimize_path(obs)
         root = tree.root
 
+        if time.time()-start_time > TIME_THRESHOLD:
+            break
         temp_node = root
         observation_builder.cells_sequence[idx] = []
 
