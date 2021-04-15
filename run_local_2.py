@@ -13,15 +13,15 @@ import random
 from flatland.core.grid.grid4_utils import get_new_position
 import r2_solver
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
-from flatland.envs.observations import  TreeObsForRailEnv
+
+from flatland.envs.observations import TreeObsForRailEnv
 import cv2
+import pickle
 
-
-class stoch_data:
-    def __init__(self, malfunction_rate, malfunction_min_duration, malfunction_max_duration):
-        self.malfunction_rate = malfunction_rate
-        self.min_duration = malfunction_min_duration
-        self.max_duration = malfunction_max_duration
+from CustomTreeObservation import CustomTreeObservation
+import transformer
+import random
+import copy
 
 
 def GetTestParams(tid):
@@ -74,15 +74,48 @@ def naive_solver(env, obs):
     return actions
 
 
-def solve(env, width, height, naive):
+def improved_solver(path_state):
+    return random.randint(0, 2)
+
+
+def TL_detector(env, obs, actions):
+    obs_paths = {}
+    for idx, agent in enumerate(env.agents):
+
+        if agent.position is None:
+            continue
+        new_direction, transition_valid = env.check_action(agent, actions[idx])
+        new_position = get_new_position(agent.position, new_direction)
+        transition_bit = bin(env.rail.get_full_transitions(*new_position))
+        total_transitions = transition_bit.count("1")
+        if total_transitions == 4:
+            agent_obs_path = copy.deepcopy(obs[idx])
+            transformer.clip_tree_for_shortest_path(agent_obs_path)
+            agent_obs_path = transformer.transform_agent_observation(agent_obs_path)
+            agent_obs_path = transformer.split_node_list(agent_obs_path, env.obs_builder.branches)
+            agent_obs_path = transformer.filter_agent_obs(agent_obs_path)
+        else:
+            agent_obs_path = None
+
+        obs_paths[idx] = agent_obs_path
+        
+    return obs_paths
+
+
+
+
+
+
+def solve(env, width, height, naive, predictor):
     env_renderer = RenderTool(env)
     solver = r2_solver.Solver(1)
+
     obs, _ = env.reset()
-    shortestPred = ShortestPathPredictorForRailEnv(max_depth=40)
-    # shortestPred.get()
-    shortestPred.env = env
-    shortestPred.get()
-    for step in range(8 * (width + height + 20)):
+    env.obs_builder.find_safe_edges(env)
+
+    predictor.env = env
+    predictor.get()
+    for step in range(100):
 
         # print(obs)
         # print(obs.shape)
@@ -100,82 +133,53 @@ def solve(env, width, height, naive):
             if _action[k] != 0 and pos in env.dev_pred_dict[k]:
                 env.dev_pred_dict[k].remove(pos)
 
+
+
+        TL_detector(env, obs, _action)
+
+
+        # for k in _action.keys():
+        #     if _action[k] != 2:
+        #         print("fdasfds")
+
         next_obs, all_rewards, done, _ = env.step(_action)
-        # print(next_obs[0]==next_obs[1])
+
 
         print("Rewards: {}, [done={}]".format(all_rewards, done))
-        img = env_renderer.render_env(show=True, show_inactive_agents=False, show_predictions=True, show_observations=True,
-                                frames=True, return_image= True)
-        cv2.imwrite("./env_images/"+str(step).zfill(3)+".jpg", img)
-        # render_env(self,
-        #            show=False,  # whether to call matplotlib show() or equivalent after completion
-        #            show_agents=True,  # whether to include agents
-        #            show_inactive_agents=False,  # whether to show agents before they start
-        #            show_observations=True,  # whether to include observations
-        #            show_predictions=False,  # whether to include predictions
-        #            frames=False,  # frame counter to show (intended since invocation)
-        #            episode=None,  # int episode number to show
-        #            step=None,  # int step number to show in image
-        #            selected_agent=None,  # indicate which agent is "selected" in the editor):
-        #            return_image=False):  # indicate if image is returned for use in monitor:
-        time.sleep(1.0)
+        img = env_renderer.render_env(show=True, show_inactive_agents=False, show_predictions=True,
+                                      show_observations=False,
+                                      frames=True, return_image=True)
+        cv2.imwrite("./env_images/" + str(step).zfill(3) + ".jpg", img)
+
         obs = next_obs.copy()
         if obs is None or done['__all__']:
             break
 
+    unfinished_agents = []
+    for k in done.keys():
+        if not done[k] and type(k) is int:
+            unfinished_agents.append(k)
 
-def approach2(naive=False):
-    # NUMBER_OF_AGENTS = 10
+    with open('observations_and_agents.pickle', 'wb') as f:
+        pickle.dump((env.obs_builder.obs_dict, unfinished_agents, env.obs_builder.branches, env.obs_builder.safe_map),
+                    f)
+    return
+
+
+if __name__ == "__main__":
     width = 25
-    height = 28
+    height = 25
 
-    rail_generator = sparse_rail_generator(max_num_cities=5, grid_mode=False, max_rails_between_cities=2,
+    rail_generator = sparse_rail_generator(max_num_cities=2, grid_mode=False, max_rails_between_cities=2,
                                            max_rails_in_city=3, seed=1)
 
+    shortestPred = ShortestPathPredictorForRailEnv(max_depth=10)
     env = RailEnv(
         width=width, height=height,
         rail_generator=rail_generator,
         schedule_generator=sparse_schedule_generator(),
-        number_of_agents=7
+        obs_builder_object=CustomTreeObservation(max_depth=8, predictor=shortestPred),
+        number_of_agents=5
     )
 
-    solve(env, width, height, naive)
-
-
-approach2(True)
-# def approach1(tid = 9):
-#     seed, width, height, nr_trains, nr_cities, max_rails_between_cities, max_rails_in_cities, malfunction_rate, malfunction_min_duration, malfunction_max_duration = GetTestParams(tid)
-#     rail_generator = sparse_rail_generator(max_num_cities=nr_cities,
-#                                            seed=seed,
-#                                            grid_mode=False,
-#                                            max_rails_between_cities=max_rails_between_cities,
-#                                            max_rails_in_city=max_rails_in_cities,
-#                                            )
-#     schedule_generator = sparse_schedule_generator(DEFAULT_SPEED_RATIO_MAP)
-#
-#     stochastic_data = {'malfunction_rate': malfunction_rate,
-#                        'min_duration': malfunction_min_duration,
-#                        'max_duration': malfunction_max_duration
-#                        }
-#     observation_builder = GlobalObsForRailEnv()
-#     env = RailEnv(width=width,
-#                   height=height,
-#                   rail_generator=rail_generator,
-#                   schedule_generator=schedule_generator,
-#                   number_of_agents=nr_trains,
-#                   malfunction_generator_and_process_data=malfunction_from_params(stoch_data(malfunction_rate, malfunction_min_duration, malfunction_max_duration)),
-#                   obs_builder_object=observation_builder,
-#                   remove_agents_at_target=True
-#                   )
-#
-#     solve(env, width, height)
-
-
-# def my_controller():
-#     """
-#     You are supposed to write this controller
-#     """
-#     _action = {}
-#     for _idx in range(NUMBER_OF_AGENTS):
-#         _action[_idx] = np.random.randint(0, 5)
-#     return _action
+    solve(env, width, height, True, shortestPred)

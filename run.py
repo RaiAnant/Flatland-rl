@@ -1,4 +1,4 @@
-from flatland.envs.observations import GlobalObsForRailEnv
+from src.graph_observations import GraphObsForRailEnv
 from flatland.evaluators.client import FlatlandRemoteClient
 import numpy as np
 import r2_solver

@@ -82,6 +82,58 @@ class GraphObsForRailEnv(ObservationBuilder):
         self.observations = None
 
 
+    def get_prev_vert(self, cur_vertex, cur_pos_on_traj, a):
+        # go back in trajectory until the beginning
+        # check if a previous vertex exists
+
+        if len(cur_vertex.Cells) == 1:
+
+            prev_pos_on_traj = cur_pos_on_traj - 1
+            agent_prev_position = self.cells_sequence[a.handle][prev_pos_on_traj]
+            prev_vertex = [vert[1] for vert in cur_vertex.Links
+                           if (vert[1].Cells[0][0] == agent_prev_position[0]
+                               and vert[1].Cells[0][1] == agent_prev_position[1])
+                           or (vert[1].Cells[-1][0] == agent_prev_position[0]
+                               and vert[1].Cells[-1][1] == agent_prev_position[1])]
+            if len(prev_vertex):
+                prev_vertex = prev_vertex[0]
+            else:
+                prev_vertex = None
+
+        else:
+
+            found = False
+            while cur_pos_on_traj > 0:
+
+                cur_pos_on_traj -= 1
+
+                prev_item = self.cells_sequence[a.handle][cur_pos_on_traj]
+
+                if prev_item not in cur_vertex.Cells:
+                    found = True
+                    break
+
+            if found:
+                agent_prev_position = self.cells_sequence[a.handle][cur_pos_on_traj]
+
+                prev_vertex = [vert[1] for vert in cur_vertex.Links
+                           if (vert[1].Cells[0][0] == agent_prev_position[0]
+                               and vert[1].Cells[0][1] == agent_prev_position[1])
+                           or (vert[1].Cells[-1][0] == agent_prev_position[0]
+                               and vert[1].Cells[-1][1] == agent_prev_position[1])]
+
+                if len(prev_vertex):
+                    prev_vertex = prev_vertex[0]
+                else:
+                    prev_vertex = None
+            else:
+                prev_vertex = None
+
+
+        return prev_vertex
+
+
+
     def set_agents_state(self):
         """
         :param observations:
@@ -92,111 +144,130 @@ class GraphObsForRailEnv(ObservationBuilder):
         # if the next positions are signals then update the graph
         # update if an agent want to enter a signal section
 
-        self.cur_pos_list = []
+        if self.ts == 0:
+            self.cur_pos_list = []
+            for a in self.env.agents:
+                self.cur_pos_list.append([self.cells_sequence[a.handle][0], self.cells_sequence[a.handle][1]])
 
         for a in self.env.agents:
-            localStatus = False
-            cur_pos = a.position if a.position is not None else a.initial_position \
-                           if a.status != RailAgentStatus.DONE_REMOVED \
-                           else tuple((0,0))
+            cur_pos = self.cur_pos_list[a.handle][0]
+            next_pos = self.cur_pos_list[a.handle][1]
+
+            if a.status == RailAgentStatus.DONE_REMOVED:
+                self.cur_pos_list[a.handle] = [tuple((0,0)), tuple((0,0)), False, [], True, False, None]
+                continue
+
+
             if cur_pos[0] == 0 and cur_pos[1] == 0:
-                self.cur_pos_list.append([cur_pos, cur_pos, False, [], True, True])
+
+                self.cur_pos_list[a.handle] = [cur_pos, next_pos, False, [], True, True, None]
+
+            elif next_pos[0] == 0 and next_pos[1] == 0:
+
+                self.cur_pos_list[a.handle] = [cur_pos, next_pos, False, [], True, True, None]
+
             else:
-                cur_pos_on_traj = [num for num,cell in enumerate(self.cells_sequence[a.handle])
-                           if cell[0] == cur_pos[0] and cell[1] == cur_pos[1]][0]
 
-                next_pos_on_traj = cur_pos_on_traj + 1
-                next_pos = self.cells_sequence[a.handle][next_pos_on_traj]
+                cur_pos_on_traj_list = [num for num, cell in enumerate(self.cells_sequence[a.handle])
+                                        if cell[0] == cur_pos[0] and cell[1] == cur_pos[1]]
 
-                if next_pos[0] == 0 and next_pos[1] == 0:
-                    self.cur_pos_list.append([cur_pos, next_pos, False, [], True, True])
+                for cur_pos_on_traj_cand in cur_pos_on_traj_list:
+                    if self.cells_sequence[a.handle][cur_pos_on_traj_cand + 1] == self.cur_pos_list[a.handle][1]:
+                        cur_pos_on_traj = cur_pos_on_traj_cand
+                        break
+
+                if a.position == None or a.position == cur_pos:
+                    cur_pos = self.cells_sequence[a.handle][cur_pos_on_traj]
+                    next_pos = self.cells_sequence[a.handle][cur_pos_on_traj + 1]
                 else:
+                    cur_pos = self.cells_sequence[a.handle][cur_pos_on_traj + 1]
+                    next_pos = self.cells_sequence[a.handle][cur_pos_on_traj + 2]
+                    cur_pos_on_traj = cur_pos_on_traj +1
 
-                    for signals in self.observations.vertices:
+                for signals in self.observations.vertices:
 
-                        if cur_pos in self.observations.vertices[signals].Cells:
-                            cur_vertex = self.observations.vertices[signals]
-                            if cur_vertex != None:
-                                cur_vertex.occupancy += 1
-
-                        if next_pos in self.observations.vertices[signals].Cells:
-                            next_vertex = self.observations.vertices[signals]
-
-                    if next_vertex == None:
-                        self.cur_pos_list.append([cur_pos, next_pos, False, [], True, True])
-                        continue
-
-                    if a.handle not in cur_vertex.currently_residing_agents:
-                        cur_vertex.currently_residing_agents.append(a.handle)
-
-                    if cur_vertex.id == next_vertex.id:
-
-                        # Need this info to check potential clipping
-                        # although it doesn't need an action
-                        vert_list = []
-
-                        if next_vertex.TrainsTraversal[a.handle][1] != None:
-                            next_vertex = next_vertex.TrainsTraversal[a.handle][1]
-
-                            while next_vertex != None:
-                                if next_vertex.is_safe:
-                                    vert_list.append(next_vertex)
-                                    break
-                                else:
-                                    vert_list.append(next_vertex)
-                                    next_vertex = next_vertex.TrainsTraversal[a.handle][1]
+                    if cur_pos in self.observations.vertices[signals].Cells:
+                        cur_vertex = self.observations.vertices[signals]
+                        if cur_vertex != None:
+                            cur_vertex.occupancy += 1
                         else:
-                            vert_list.append(next_vertex)
+                            print("Here")
 
-                        self.cur_pos_list.append([cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe])
+                    if next_pos in self.observations.vertices[signals].Cells:
+                        next_vertex = self.observations.vertices[signals]
 
-                    else:
+                if cur_pos_on_traj == 0:
+                    prev_vertex = None
+                else:
+                    prev_vertex = self.get_prev_vert(cur_vertex, cur_pos_on_traj, a)
 
-                        # Need this info to check potential clipping
-                        # although it doesn't need an action
 
-                        vert_list = []
+                if next_vertex == None:
+                    self.cur_pos_list[a.handle] = [cur_pos, next_pos, False, [], True, True, cur_vertex]
+                    continue
 
-                        #initial_safe_switch = False if cur_vertex.is_safe else True
-                        #next_safe_switch = False if next_vertex.is_safe else True
+                if cur_vertex.id == next_vertex.id:
 
-                        # determine if it is safe to unsafe
-                        # or unsafe to safe
-                        # or safe to safe or unsafe to unsafe
+                    vert_list = []
+                    decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe, cur_vertex]
 
-                        decision = []
-                        if cur_vertex.is_safe and next_vertex.is_safe:
-                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
-                        elif not cur_vertex.is_safe and not next_vertex.is_safe:
-                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
-                        elif not cur_vertex.is_safe and next_vertex.is_safe:
-                            decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe]
-                        elif cur_vertex.is_safe and not next_vertex.is_safe:
-                            decision = [cur_pos, next_pos, True, vert_list, False, cur_vertex.is_safe]
-
-                        if decision == []:
-                            print("problem")
+                    if next_vertex.TrainsTraversal[a.handle][0][1] != None:
 
                         while True:
 
-                            # if next_pos == (22, 23) and cur_pos == (23, 23) and a.handle == 24:
-                            #     print("Debug")
-                            if next_vertex is None:
+                            next_vertex = [vert[1] for vert in cur_vertex.TrainsTraversal[a.handle]
+                                           if vert[0] == prev_vertex][0]
+                            if next_vertex == None:
                                 break
+                            elif next_vertex.is_safe:
 
-
-                            if next_vertex.is_safe:
                                 vert_list.append(next_vertex)
                                 break
                             else:
                                 vert_list.append(next_vertex)
-                                try:
-                                    next_vertex = next_vertex.TrainsTraversal[a.handle][1]
-                                except IndexError:
-                                    print("Debug!")
 
-                        decision[3] = vert_list
-                        self.cur_pos_list.append(decision)
+                            prev_vertex = cur_vertex
+                            cur_vertex = next_vertex
+
+                    else:
+                        vert_list.append(next_vertex)
+
+                    decision[3] = vert_list
+                    self.cur_pos_list[a.handle] = decision
+
+                else:
+
+                    vert_list = []
+                    decision = []
+                    if cur_vertex.is_safe and next_vertex.is_safe:
+                        decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe, cur_vertex]
+                    elif not cur_vertex.is_safe and not next_vertex.is_safe:
+                        decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe, cur_vertex]
+                    elif not cur_vertex.is_safe and next_vertex.is_safe:
+                        decision = [cur_pos, next_pos, False, vert_list, True, cur_vertex.is_safe, cur_vertex]
+                    elif cur_vertex.is_safe and not next_vertex.is_safe:
+                        decision = [cur_pos, next_pos, True, vert_list, False, cur_vertex.is_safe, cur_vertex]
+
+                    while True:
+
+                        if next_vertex == None:
+                            break
+                        elif next_vertex.is_safe:
+                            vert_list.append(next_vertex)
+                            break
+                        else:
+                            vert_list.append(next_vertex)
+                            try:
+                                next_vertex = [vert[1] for vert in cur_vertex.TrainsTraversal[a.handle]
+                                           if vert[0] == prev_vertex][0]
+                            except:
+                                raise Exception("Here")
+
+                        prev_vertex = cur_vertex
+                        cur_vertex = next_vertex
+
+                    decision[3] = vert_list
+                    self.cur_pos_list[a.handle] = decision
 
 
 
@@ -256,8 +327,8 @@ class GraphObsForRailEnv(ObservationBuilder):
             self.build_global_graph()
 
         self.prediction_dict = self.predictor.get()
-        local = self.predictor.compute_cells_sequence(self.prediction_dict)
         if self.cells_sequence is None:
+            local = self.predictor.compute_cells_sequence(self.prediction_dict)
             self.cells_sequence = local
             self.max_prediction_depth = self.predictor.max_depth
 
@@ -268,24 +339,28 @@ class GraphObsForRailEnv(ObservationBuilder):
                                  else tuple((0,0))
                 self.agent_position_data[a.handle].append(current_position)
 
-        observations = copy.deepcopy(self.base_graph)
-        self.observations = self.populate_graph(observations)
+        #observations = copy.deepcopy(self.base_graph)
+        #if self.ts == 0:
+        self.populate_graph()
         self.observations.setCosts()
         self.set_agents_state()
 
         return self.observations
 
 
-    def populate_graph(self, observations):
+
+
+    def populate_graph(self):
         """
         Inherited method used for pre computations.
         :return:
         """
-
+        self.observations = copy.deepcopy(self.base_graph)
         agent_initial_positions = defaultdict(list)
         for a in self.env.agents:
-            new_edge = [observations.vertices[vertex] for vertex in observations.vertices \
-                                                if a.initial_position in observations.vertices[vertex].Cells][0]
+            new_edge = [self.observations.vertices[vertex] for vertex in self.observations.vertices \
+                                                if a.initial_position in self.observations.vertices[vertex].Cells][0]
+            new_edge.is_starting_edge = True
             agent_initial_positions[a.handle] = [a.initial_position, new_edge]
 
 
@@ -298,18 +373,61 @@ class GraphObsForRailEnv(ObservationBuilder):
 
             # Build one vector of time spent on already travelled trajectory
             # and the planned one
-            agent_time_stepwise = [int(1/self.env.agents[a].speed_data['speed'])]*len(self.cells_sequence[a])
-            time_data = [len(list(i_list)) for i, i_list in groupby(self.agent_position_data[a])]
-            agent_time_stepwise = time_data + agent_time_stepwise[len(time_data):]
 
             # initial state
-            start_timestamp = 0
             agent_current_vertex = agent_initial_positions[a][1]
-            #agent_current_vertex.occupancy += 1
             agent_prev_vertex = None
             agent_trajectory = self.cells_sequence[a]
-            agent_pos_on_traj = 0
-            end_timestamp = 0
+
+
+            if len(agent_current_vertex.Cells) > 1:
+                index = [num for num,cell in enumerate(agent_current_vertex.Cells)
+                         if cell[0] == agent_trajectory[0][0] and cell[1] == agent_trajectory[0][1]]
+                if not len(index):
+                    raise Exception("agent start position not found while populating the graph")
+
+                trajectory_to_begin = agent_current_vertex.Cells[0:index[0]+1][::-1]
+                trajectory_to_end = agent_current_vertex.Cells[index[0]:]
+
+                if trajectory_to_end == agent_trajectory[:len(trajectory_to_end)]:
+
+                    res = [[num, vert[1]] for num,vert in enumerate(agent_current_vertex.Links)
+                                         if vert[0][0] == trajectory_to_end[-1][0]
+                                         and vert[0][1] == trajectory_to_end[-1][1]][0]
+                    if not len(res):
+                        raise Exception("vertex not found in links")
+
+                    agent_dir, agent_next_vertex = res[0], res[1]
+                    agent_pos_on_traj = len(trajectory_to_end)
+
+                if trajectory_to_begin == agent_trajectory[:len(trajectory_to_begin)]:
+                    res = [[num, vert[1]] for num,vert in enumerate(agent_current_vertex.Links)
+                                         if vert[0][0] == trajectory_to_begin[-1][0]
+                                         and vert[0][1] == trajectory_to_begin[-1][1]][0]
+                    if not len(res):
+                        raise Exception("vertex not found in links")
+
+                    agent_dir, agent_next_vertex = res[0], res[1]
+                    agent_pos_on_traj = len(trajectory_to_begin)
+
+            else:
+                agent_next_position = agent_trajectory[1]
+
+                res = [[num, vert[1]] for num, vert in enumerate(agent_current_vertex.Links)
+                                     if (vert[1].Cells[0][0] == agent_next_position[0]
+                                         and vert[1].Cells[0][1] == agent_next_position[1])
+                                     or (vert[1].Cells[-1][0] == agent_next_position[0]
+                                         and vert[1].Cells[-1][1] == agent_next_position[1])][0]
+                agent_dir, agent_next_vertex = res[0], res[1]
+                agent_pos_on_traj = 1
+
+
+            agent_current_vertex.Trains.append(a)
+            agent_current_vertex.TrainsTraversal[a] = [[None, agent_next_vertex]]
+            agent_current_vertex.TrainsDir.append(agent_dir)
+
+            agent_prev_vertex = agent_current_vertex
+            agent_current_vertex = agent_next_vertex
 
             # start with the beginning
             # find next exit on trajectory
@@ -320,109 +438,75 @@ class GraphObsForRailEnv(ObservationBuilder):
                         or (agent_current_vertex.Type == "edge" and \
                         len(agent_current_vertex.Cells) == 1):
 
-                    agent_next_position = agent_trajectory[agent_pos_on_traj+1]
-                    agent_next_pos_on_traj = agent_pos_on_traj+1
-
-
-                    if (agent_current_vertex.Type == "edge" \
-                            and agent_current_vertex.Cells[0] != agent_trajectory[-2])\
-                            or agent_current_vertex.Type == "junction":
-
-                        agent_next_vertex, agent_next_dir = \
-                                    [[item[1], num] for num, item in enumerate(agent_current_vertex.Links)
-                                            if agent_next_position in item[1].Cells][0]
-
+                    if agent_pos_on_traj+1 >= len(agent_trajectory)-1:
                         agent_current_vertex.Trains.append(a)
-                        agent_current_vertex.TrainsDir.append(agent_next_dir)
+                        agent_current_vertex.TrainsTraversal[a] = [[agent_prev_vertex, None]]
 
-                        end_timestamp = start_timestamp + \
-                                        np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
-                        agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
-
-                        if agent_next_position == None and agent_prev_vertex == None:
-                            print("here")
-
-                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
-
-                    else:
-                        if agent_next_position == None and agent_prev_vertex == None:
-                            print("here")
-
-                        agent_current_vertex.Trains.append(a)
-                        agent_current_vertex.TrainsDir.append(-1)
-                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
-                        agent_current_vertex.TrainsTime.append([start_timestamp, start_timestamp+1])
-
+                        agent_dir = [num for num,item in enumerate(agent_current_vertex.Links)
+                                     if item[1] != agent_prev_vertex][0]
+                        agent_current_vertex.TrainsDir.append(agent_dir)
                         break
 
+                    agent_next_pos_on_traj = agent_pos_on_traj+1
+                    agent_next_position = agent_trajectory[agent_next_pos_on_traj]
+
+                    agent_next_vertex = [[num,vert[1]] for num,vert in enumerate(agent_current_vertex.Links)
+                                         if (vert[1].Cells[0][0] == agent_next_position[0]
+                                         and vert[1].Cells[0][1] == agent_next_position[1])
+                                         or (vert[1].Cells[-1][0] == agent_next_position[0]
+                                         and vert[1].Cells[-1][1] == agent_next_position[1])]
+
+                    agent_next_vertex = agent_next_vertex[0]
+
+                    agent_current_vertex.Trains.append(a)
+
+                    if a in agent_current_vertex.TrainsTraversal.keys():
+                        temp = agent_current_vertex.TrainsTraversal[a]
+                        temp.append([agent_prev_vertex, agent_next_vertex[1]])
+                        agent_current_vertex.TrainsTraversal[a] = temp
+                    else:
+                        agent_current_vertex.TrainsTraversal[a] = [[agent_prev_vertex, agent_next_vertex[1]]]
+
+                    agent_current_vertex.TrainsDir.append(agent_next_vertex[0])
+                    agent_next_vertex = agent_next_vertex[1]
 
                 elif agent_current_vertex.Type == "edge":
 
-                    if agent_current_vertex.Cells[0] in agent_trajectory[agent_pos_on_traj+1: agent_pos_on_traj+21]:
-
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[0]][0]
-
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
-
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
-
+                    if agent_pos_on_traj+len(agent_current_vertex.Cells) >= len(agent_trajectory)-1:
                         agent_current_vertex.Trains.append(a)
-                        agent_current_vertex.TrainsDir.append(agent_next_dir)
+                        agent_current_vertex.TrainsTraversal[a] = [[agent_prev_vertex, None]]
 
-                        end_timestamp = start_timestamp + \
-                                        np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
-                        agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
-
-                        if agent_next_position == None and agent_prev_vertex == None:
-                            print("here")
-
-                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
-
-                    elif agent_current_vertex.Cells[-1] in agent_trajectory[agent_pos_on_traj+1:]:
-
-                        agent_next_vertex, agent_next_dir = [[item[1],num] for num, item in enumerate(agent_current_vertex.Links)
-                                             if item[0] == agent_current_vertex.Cells[-1]][0]
-
-                        agent_next_position = [item[0] for item in agent_next_vertex.Links if item[1] == agent_current_vertex][0]
-
-                        agent_next_pos_on_traj =  agent_pos_on_traj + \
-                                                  [num for num, cell in enumerate(agent_trajectory[agent_pos_on_traj:]) \
-                                    if cell[0] == agent_next_position[0] and cell[1] == agent_next_position[1]][0]
-
-                        agent_current_vertex.Trains.append(a)
-                        agent_current_vertex.TrainsDir.append(agent_next_dir)
-
-                        end_timestamp = start_timestamp + \
-                                        np.sum(agent_time_stepwise[agent_pos_on_traj:agent_next_pos_on_traj])
-                        agent_current_vertex.TrainsTime.append([start_timestamp, end_timestamp])
-
-                        if agent_next_position == None and agent_prev_vertex == None:
-                            print("here")
-
-                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, agent_next_vertex]
-
-                    elif agent_trajectory[-2] in agent_current_vertex.Cells:
-                        #print("Trajectory End")
-                        if agent_next_position == None and agent_prev_vertex == None:
-                            print("here")
-
-                        agent_current_vertex.Trains.append(a)
-                        agent_current_vertex.TrainsDir.append(-1)
-                        agent_current_vertex.TrainsTraversal[a] = [agent_prev_vertex, None]
-                        agent_current_vertex.TrainsTime.append([start_timestamp, start_timestamp+1])
-
+                        agent_dir = [num for num,item in enumerate(agent_current_vertex.Links)
+                                     if item[1] != agent_prev_vertex][0]
+                        agent_current_vertex.TrainsDir.append(agent_dir)
                         break
 
-                start_timestamp = end_timestamp
+                    agent_next_pos_on_traj = agent_pos_on_traj+len(agent_current_vertex.Cells)
+                    agent_next_position = agent_trajectory[agent_next_pos_on_traj]
+
+                    agent_next_vertex = [[num,vert[1]] for num,vert in enumerate(agent_current_vertex.Links)
+                                         if (vert[1].Cells[0][0] == agent_next_position[0]
+                                         and vert[1].Cells[0][1] == agent_next_position[1])
+                                         or (vert[1].Cells[-1][0] == agent_next_position[0]
+                                         and vert[1].Cells[-1][1] == agent_next_position[1])]
+
+                    agent_next_vertex = agent_next_vertex[0]
+
+                    agent_current_vertex.Trains.append(a)
+
+                    if a in agent_current_vertex.TrainsTraversal.keys():
+                        temp = agent_current_vertex.TrainsTraversal[a]
+                        temp.append([agent_prev_vertex, agent_next_vertex[1]])
+                        agent_current_vertex.TrainsTraversal[a] = temp
+                    else:
+                        agent_current_vertex.TrainsTraversal[a] = [[agent_prev_vertex, agent_next_vertex[1]]]
+
+                    agent_current_vertex.TrainsDir.append(agent_next_vertex[0])
+                    agent_next_vertex = agent_next_vertex[1]
+
                 agent_prev_vertex = agent_current_vertex
                 agent_current_vertex = agent_next_vertex
                 agent_pos_on_traj = agent_next_pos_on_traj
-
-
-        return observations
 
 
     # For Global Graph
@@ -435,7 +519,7 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         for junctions in self.forks_coords:
             vertex = self.base_graph.add_signal_vertex("junction", junctions)
-            vertex.DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
+            #vertex.DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
 
             path_list = self._step(junctions)
             # there is following data in the node list
@@ -451,8 +535,8 @@ class GraphObsForRailEnv(ObservationBuilder):
                 if len(path[2]) > 2:
                     edge_vertex_cells = path[2][1:-1]
                     edge_vertex = self.base_graph.add_edge_vertex("edge", edge_vertex_cells)
-                    edge_vertex.DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents),
-                                                     dtype=np.uint8)
+                    #edge_vertex.DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents),
+                    #                                 dtype=np.uint8)
 
                     vertex.Links.append([junctions, edge_vertex])
                     edge_vertex.Links.append([edge_vertex_cells[0], vertex])
@@ -472,7 +556,12 @@ class GraphObsForRailEnv(ObservationBuilder):
         traj = []
 
         position = get_new_position(current, direction)
-        traj.append(position)
+        if not (position[0] > self.env.height-1 or position[1] > self.env.width-1 or
+                position[0] < 0 or position[1] < 0):
+            if self.env.rail.grid[position[0]][position[1]] != 0:
+                traj.append(position)
+        else:
+            return None, None
 
         while True:
 
@@ -490,7 +579,10 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                 if pos[0] in [0, 5, 10, 15] and pos[1] in [0, 5, 10, 15]:  # simple straight
                     position = get_new_position(position, direction)
-                    traj.append(position)
+                    if not (position[0] > self.env.height-1 or position[1] > self.env.width-1 or
+                            position[0] < 0 or position[1] < 0):
+                        if self.env.rail.grid[position[0]][position[1]] != 0:
+                            traj.append(position)
 
                 else:
                     if pos[0] in [1, 14] or pos[1] in [1, 14]:  # simple right
@@ -537,7 +629,12 @@ class GraphObsForRailEnv(ObservationBuilder):
             traj.append(init_position)
 
             position = get_new_position(init_position, direction)
-            traj.append(position)
+            if not (position[0] > self.env.height-1 or position[1] > self.env.width-1 or
+                    position[0] < 0 or position[1] < 0):
+                if self.env.rail.grid[position[0]][position[1]] != 0:
+                    traj.append(position)
+            else:
+                continue
 
             while True:
 
@@ -560,7 +657,6 @@ class GraphObsForRailEnv(ObservationBuilder):
                     # if straight : means dead end
                     # if simple left : explore recursively by changing direction to left
                     # if simple right : explore recursively by changing direction to right
-                    #position = get_new_position(position, direction)
 
                     cell_transitions_bitmap = np.asarray([int(item) for item in cell_transitions_bitmap[2:]])
                     pos = np.where(cell_transitions_bitmap == 1)
@@ -568,7 +664,10 @@ class GraphObsForRailEnv(ObservationBuilder):
 
                     if pos[0] in [0, 5, 10, 15] and pos[1] in [0, 5, 10, 15]:  # simple straight
                         position = get_new_position(position, direction)
-                        traj.append(position)
+                        if not (position[0] > self.env.height-1 or position[1] > self.env.width-1 or
+                                position[0] < 0 or position[1] < 0):
+                            if self.env.rail.grid[position[0]][position[1]] != 0:
+                                traj.append(position)
 
                     else:
                         if pos[0] in [1,14] or pos[1] in [1, 14]:  # simple right
@@ -595,8 +694,11 @@ class GraphObsForRailEnv(ObservationBuilder):
                             print("Failed")
 
                         temp, temp1 = self._step_extend(position, direction)
-                        traj = traj + temp1
-                        node_list.append([temp[0], temp[1], traj])
+
+                        if not (temp == None and temp1 == None):
+                            traj = traj + temp1
+                            node_list.append([temp[0], temp[1], traj])
+
                         break
                 else:
                     node_list.append([position, total_transitions, traj])
@@ -604,298 +706,3 @@ class GraphObsForRailEnv(ObservationBuilder):
 
         return node_list
 
-
-    def setDeadLocks(self, obs):
-
-        # find the agent's remaining trajectory
-
-        # find agents on shared paths
-        # some might have exclusive paths as well, who knows !!
-        agent_pos = []
-        agent_traj = []
-        for a in self.env.agents:
-            #agent_pos.append(a.position if a.position is not None
-            #                 else a.initial_position if a.status is not RailAgentStatus.DONE_REMOVED
-            #                 else a.target)
-            agent_pos_on_traj = [num for num,item in enumerate(self.cells_sequence[a.handle])
-                                 if item[0] == self.cur_pos_list[a.handle][0][0]
-                                 and item[1] == self.cur_pos_list[a.handle][0][1]][0]
-            agent_traj.append(self.cells_sequence[a.handle][agent_pos_on_traj:])
-
-
-        dead_lock_matrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-
-        for agent_id, trajectory in enumerate(agent_traj):
-            for other_agent_id, other_trajectory in enumerate(agent_traj):
-                if agent_id != other_agent_id:
-
-                    if not self.cur_pos_list[agent_id][2] and len(trajectory) > 3:
-                        is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
-                                               if item[0][0] == trajectory[1][0]
-                                               and item[0][1] == trajectory[1][1]]
-
-                        if len(is_next_in_queue):
-                            new_dead_locks = []
-                            for deadlock in obs.Deadlocks:
-                                if deadlock[0] == is_next_in_queue[0]:
-                                    if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
-                                            and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
-                                            and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
-                                            and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
-
-                                        vertex_end_1 = obs.vertices[deadlock[2]].Cells[0]
-                                        vertex_end_2 = obs.vertices[deadlock[2]].Cells[-1]
-
-                                        end_pos = [num for num,item in enumerate(trajectory)
-                                                     if (item[0] == vertex_end_1[0]
-                                                     and item[1] == vertex_end_1[1])
-                                                     or (item[0] == vertex_end_2[0]
-                                                     and item[1] == vertex_end_2[1])]
-
-                                        if len(end_pos):
-                                            new_dead_locks.append([agent_id, deadlock[1], deadlock[2]])
-
-                            for deadlock in new_dead_locks:
-                                if deadlock not in obs.Deadlocks:
-                                    obs.Deadlocks.append(deadlock)
-
-                    # while True:
-                    #
-                    #     if len(trajectory) > 3:
-                    #         is_next_in_queue = [num for num,item in enumerate(self.cur_pos_list)
-                    #                                if item[0][0] == trajectory[1][0]
-                    #                                and item[0][1] == trajectory[1][1]]
-                    #
-                    #         break_inner = False
-                    #
-                    #         if len(is_next_in_queue):
-                    #             for deadlock in obs.Deadlocks:
-                    #                 if deadlock[0] == is_next_in_queue[0]:
-                    #                     if agent_traj[deadlock[0]][1][0] == trajectory[2][0] \
-                    #                             and agent_traj[deadlock[0]][1][1] == trajectory[2][1] \
-                    #                             and agent_traj[deadlock[0]][2][0] == trajectory[3][0] \
-                    #                             and agent_traj[deadlock[0]][2][1] == trajectory[3][1]:
-                    #                         trajectory = trajectory[1:]
-                    #                         break_inner = True
-                    #                         break
-                    #
-                    #     else:
-                    #         break
-                    #
-                    #     if not break_inner:
-                    #         break
-                    #
-                    #if len(is_next_in_queue) \
-                    #        and self.env.agents[agent_id].position == self.env.agents[agent_id].old_position\
-                    #        and self.env.agents[agent_id].position != self.env.agents[agent_id].initial_position\
-                    #        and self.env.agents[agent_id].position is not None:
-                    #    trajectory = trajectory[1:]
-
-                    else:
-
-                        pos_first_in_second = [num for num,item in enumerate(trajectory)
-                                              if item[0] == other_trajectory[0][0]
-                                              and item[1] == other_trajectory[0][1]]
-
-                        if len(pos_first_in_second):
-                            first_agent_traj_from_overlap = trajectory[1:pos_first_in_second[0]+1][::-1]
-
-                            if len(first_agent_traj_from_overlap) > 1:
-                                incre = 0
-
-                                while True:
-
-                                    # other agent ends before reaching current position of agent
-                                    # it would not have to cross teh agent
-                                    if incre == len(other_trajectory):
-                                        break
-                                    elif incre == len(first_agent_traj_from_overlap):
-
-                                        dead_lock_matrix[agent_id][other_agent_id] = 1
-                                        first_agent_traj_from_overlap = first_agent_traj_from_overlap[::-1]
-
-                                        pos_on_conflict_section = 0
-
-                                        outer = True
-                                        while outer:
-
-                                            for vertex in obs.vertices:
-
-                                                is_pos_on_vertex = [num for num,item in enumerate(obs.vertices[vertex].Cells)
-                                                                    if first_agent_traj_from_overlap[pos_on_conflict_section][0]
-                                                                    == item[0] and
-                                                                    first_agent_traj_from_overlap[pos_on_conflict_section][1]
-                                                                    == item[1]]
-
-                                                if len(is_pos_on_vertex):
-                                                    if obs.vertices[vertex].Type == "edge":
-                                                        if obs.vertices[vertex].update_ts < self.ts:
-                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                            obs.vertices[vertex].update_ts = self.ts
-
-                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
-
-                                                        exit_point = obs.vertices[vertex].other_end(first_agent_traj_from_overlap[pos_on_conflict_section])
-
-                                                        exit_position_on_conflict_section =[num for num,item in enumerate(first_agent_traj_from_overlap)
-                                                                                            if item[0] == exit_point[0]
-                                                                                            and item[1] == exit_point[1]]
-
-                                                        if len(exit_position_on_conflict_section):
-
-                                                            if ([agent_id, other_agent_id, vertex]
-                                                                    not in obs.Deadlocks):
-                                                                obs.Deadlocks.append([agent_id, other_agent_id, vertex])
-
-                                                            if len(first_agent_traj_from_overlap) > exit_position_on_conflict_section[0] + 1:
-                                                                pos_on_conflict_section = exit_position_on_conflict_section[0] + 1
-                                                                break
-                                                            else:
-                                                                outer = False
-                                                                break
-                                                        else:
-                                                            #print("possibly wrong calculation in deadlock")
-
-                                                            outer = False
-                                                            break
-                                                    else:
-
-                                                        if obs.vertices[vertex].update_ts < self.ts:
-                                                            obs.vertices[vertex].DeadLockMatrix = np.zeros((self.env.number_of_agents, self.env.number_of_agents), dtype=np.uint8)
-                                                            obs.vertices[vertex].update_ts = self.ts
-
-                                                        obs.vertices[vertex].DeadLockMatrix[agent_id][other_agent_id] = 1
-
-                                                        if len(first_agent_traj_from_overlap) > \
-                                                                pos_on_conflict_section + 1:
-                                                            pos_on_conflict_section += 1
-                                                            break
-                                                        else:
-                                                            outer = False
-                                                            break
-                                        break
-                                    elif not(first_agent_traj_from_overlap[incre][0] == other_trajectory[incre][0] \
-                                            and first_agent_traj_from_overlap[incre][1] == other_trajectory[incre][1]):
-                                        # this is the point of seperation
-                                        # might not be safe.
-
-                                        next_exit_point = other_trajectory[incre]
-
-                                        last_is_occupied = [num for num,item in enumerate(self.cur_pos_list)
-                                                            if item[0][0] == next_exit_point[0]
-                                                            and item[0][1] == next_exit_point[1]]
-
-                                        if len(last_is_occupied):
-                                            dead_lock_matrix[agent_id][agent_id] = 1
-                                        break
-
-                                    incre += 1
-
-
-    def update_for_delay(self, observations, a, vert_type):
-        """
-        Inherited method used for pre computations.
-        :return:
-        """
-
-        agent = self.env.agents[a]
-        is_last_edge = False
-
-        current_edge = [observations.vertices[vertex] for vertex in observations.vertices \
-                            if agent.initial_position in observations.vertices[vertex].Cells][0]
-
-        # collect all junctions until next edge
-        next_vertex = current_edge
-
-        initial_lapse = 0
-
-        while not is_last_edge:
-
-            junc_list = []
-
-            while not is_last_edge:
-
-                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
-
-                junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
-
-                next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
-
-                if next_vertex.Type != "junction":
-                    try:
-                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
-                    except:
-                        is_last_edge = True
-                        continue
-
-                    junc_list.append([next_vertex.Type, next_vertex.TrainsTime[agent_index]])
-                    break
-
-            if is_last_edge:
-                continue
-
-            next_list = []
-
-            if initial_lapse != 0:
-                pass
-
-            elif vert_type == "junction":
-                current_time_val = junc_list[::-1][1][1][1]
-
-                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
-
-                for item in junc_list[::-1][1:-1]:
-
-                    next_list.append([[current_time_val-1,current_time_val], item[0]])
-                    current_time_val -= 1
-
-                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
-
-                if junc_list[::-1][-1][1][0] > current_time_val:
-                    pass
-            elif vert_type == "edge":
-                current_time_val = junc_list[::-1][0][1][0]
-
-                next_list.append([[current_time_val, current_time_val + junc_list[::-1][0][1][1] - junc_list[::-1][0][1][0]], junc_list[::-1][0][0]])
-
-                for item in junc_list[::-1][1:-1]:
-
-                    next_list.append([[current_time_val-1,current_time_val], item[0]])
-                    current_time_val -= 1
-
-                next_list.append([[junc_list[::-1][-1][1][0], current_time_val], junc_list[::-1][-1][0]])
-
-            next_list = next_list[::-1]
-
-            if initial_lapse == 0:
-                junc_list_temp = [item[1][1] - item[1][0] for item in junc_list]
-                next_list_temp = [item[0][1] - item[0][0] for item in next_list]
-                initial_lapse = abs(((np.sum(junc_list_temp)) - ((np.sum(next_list_temp)))))
-
-
-            next_vertex = current_edge
-
-            filler_index = 0
-
-            while True:
-                agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
-
-                if len(next_list):
-
-                    next_vertex.TrainsTime[agent_index][0] = next_list[filler_index][0][0]
-                    next_vertex.TrainsTime[agent_index][1] = next_list[filler_index][0][1]
-
-                elif filler_index > 0:
-                        agent_index = [num for num, item in enumerate(next_vertex.Trains) if item == a][0]
-                        next_vertex.TrainsTime[agent_index][0] += initial_lapse
-                        next_vertex.TrainsTime[agent_index][1] += initial_lapse
-
-                filler_index += 1
-
-                if len(junc_list) == filler_index:
-                    current_edge = next_vertex
-                    break
-                else:
-                    next_vertex = next_vertex.Links[next_vertex.TrainsDir[agent_index]][1]
-
-        return observations

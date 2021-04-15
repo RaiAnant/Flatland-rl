@@ -15,31 +15,13 @@ class vertex:
         self.Cells = node
 
         self.Trains = []
-        self.TrainsTime = []
         self.TrainsDir = []  # 0 = A->B, 1 = B->A
         self.Links = []
         self.TrainsTraversal = defaultdict(list)
 
-
-        #self.CollisionLockMatrix = []  # train 0 with train 1 and train 1 with train 0
-        #self.DeadLockMatrix = []  # train 0 with train 1 and train 1 with train 0
-
-        #self.CostPerTrain = []
-        #self.DeadlockCostPerTrain = []
-
-        #self.CostCollisionLockTotal = 0
-        #self.CostDeadLockTotal = 0
-
-        #self.CostTotal = 0
-
-        self.update_ts = 0
-
-        self.currently_residing_agents = []
-
         self.is_signal_on = False
+        self.is_starting_edge = False
 
-        #self.signal_time = 0
-        #self.signal_deadlocks = []
         self.is_safe = True
         self.occupancy = 0
         self.extended_capacity = len(node)
@@ -53,36 +35,9 @@ class vertex:
         return 'Type : ' + str(self.Type) \
                 + '; Trains: ' + str(self.Trains) \
                 + '; Safety Status: ' + str(self.is_safe)
-                # + '; Cost: ' + str(self.CostTotal) \
 
     def other_end(self, first):
         return self.Cells[0] if self.Cells[-1] == first else self.Cells[-1]
-
-    """
-    def setCollision(self):
-
-        self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
-
-        for agent_pos_id, agent_id in enumerate(self.Trains):
-
-            # find direction of first agent
-            agent_dir = self.TrainsDir[agent_pos_id]
-
-            # find the agents which are not in teh same direction (can be many if junction)
-            opposing_agents = [num for num, item in enumerate(self.TrainsDir) if item != agent_dir]
-
-
-            if len(opposing_agents):
-                for opp_agent in opposing_agents:
-
-                    bitmap = np.zeros((np.max(self.TrainsTime) + 1))
-                    bitmap[self.TrainsTime[opp_agent][0]:self.TrainsTime[opp_agent][1]+1] = 1
-
-                    if np.any(bitmap[self.TrainsTime[agent_pos_id][0]:self.TrainsTime[agent_pos_id][1]+1] > 0):
-                        self.CollisionLockMatrix[agent_pos_id][opp_agent] = 1
-    """
-
-
 
     def setCosts(self):
         """
@@ -105,14 +60,14 @@ class vertex:
         #    self.signal_time -= 1
         #    self.signal_deadlocks = []
 
-        # start_times = [item[0] for item in self.TrainsTime]
-        # agent_dirs = np.unique(self.TrainsDir)
-        # if np.max(start_times) == 0:
-        #     self.is_safe = True
-        # else:
-        #     self.is_safe = True if len(agent_dirs) <= 1 else False
+        #start_times = [item[0] for item in self.TrainsTime]
+        agent_dirs = np.unique(self.TrainsDir)
+        if self.is_starting_edge:
+            self.is_safe = True
+        else:
+            self.is_safe = True if len(agent_dirs) <= 1 else False
 
-        self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
+        #self.is_safe = True if len(np.unique(self.TrainsDir)) <= 1 else False
 
 
     def setExtendedCapacity(self):
@@ -137,8 +92,10 @@ class vertex:
                 for next_vertex in vertex.Links:
                     if next_vertex[1].is_safe and next_vertex[1].id not in explored:
                         pending_to_explore.append(next_vertex[1])
+            self.extended_capacity = capacity
 
-            self.extended_capacity = self.capacity + capacity
+        if self.extended_capacity > 2*self.capacity:
+            self.extended_capacity = 2*self.capacity
 
 
 class Global_Graph:
@@ -147,10 +104,10 @@ class Global_Graph:
         """
         self.vertices = {}
         self.num_vertices = 0
-        self.Deadlocks = []
-        self.LastUpdated = 0
+        #self.Deadlocks = []
+        #self.LastUpdated = 0
 
-        self.CostTotalEnv = 0
+        #self.CostTotalEnv = 0
 
     def __str__(self):
         """
@@ -171,9 +128,9 @@ class Global_Graph:
                 self.vertices[vertex].setCosts()
             #cost += self.vertices[vertex].CostTotal
 
-        for vertex in self.vertices:
-            if len(self.vertices[vertex].Trains):
-                self.vertices[vertex].setExtendedCapacity()
+        #for vertex in self.vertices:
+        #    if len(self.vertices[vertex].Trains):
+        #        self.vertices[vertex].setExtendedCapacity()
 
         #self.CostTotalEnv = cost
 

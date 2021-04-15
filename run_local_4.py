@@ -21,21 +21,35 @@ from src.util.tree_builder import Agent_Tree
 from src.junction_graph_observations import GraphObsForRailEnv
 from src.predictions import ShortestPathPredictorForRailEnv
 
-from src.optimizer import get_action_dict_safety, optimize
+
+
 from src.util.tree_builder import optimize_all_agent_paths_for_min_flow_cost
 from flatland.envs.rail_generators import rail_from_file
 from flatland.envs.schedule_generators import schedule_from_file
 from flatland.core.env_observation_builder import DummyObservationBuilder
 from flatland.envs.malfunction_generators import malfunction_from_file
 
+from src.optimizer import get_action_dict_safety
+
+
 import cv2
 
+import sys
+
+sys.setrecursionlimit(10000)
+
+def sumcs(cell_sequence):
+    sum = 0
+    for item in cell_sequence:
+        sum += len(cell_sequence)
+    return sum
+
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 200
-    width = 35
-    height = 35
+    NUMBER_OF_AGENTS = 5
+    width = 25
+    height = 25
     max_prediction_depth = 300
-    NUM_CITIES = 3
+    NUM_CITIES = 2
     SIGNAL_TIMER = 2
     # problem
     # NUMBER_OF_AGENTS = 100
@@ -60,15 +74,13 @@ if __name__ == "__main__":
     # max_prediction_depth = 200
     # NUM_CITIES = 5
 
-    NUMBER_OF_AGENTS = 50
-    width = 35
-    height = 35
-    max_prediction_depth = 200
-    NUM_CITIES = 4
+
+
+
 
     SIGNAL_TIMER = 2
 
-    test_env_file_path = '/home/anant/Projects/flatland-challenge-starter-kit-master/scratch/test-envs/Test_0/Level_0.pkl'
+    test_env_file_path = None
 
     find_alternate_paths = True
 
@@ -108,6 +120,7 @@ if __name__ == "__main__":
     env_renderer = RenderTool(env)
     obs_list = []
 
+
     conflict_data = []
 
     # obs_temp = copy.deepcopy(obs)
@@ -120,17 +133,23 @@ if __name__ == "__main__":
                                   show_observations=True,
                                   frames=True,
                                   return_image=True)
-    if find_alternate_paths:
-        obs = optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder)
+    # if find_alternate_paths:
+    #     obs = optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder)
+
+
+
+
 
     for step in range(20 * (width + height + 20)):
+
+
 
         print("==================== ", step)
 
         _action = get_action_dict_safety(observation_builder, SIGNAL_TIMER)
 
-        obs_temp = copy.deepcopy(obs)
-        obs_list.append(obs_temp)
+        #obs_temp = copy.deepcopy(obs)
+        #obs_list.append(obs_temp)
 
         next_obs, all_rewards, done, _ = env.step(_action)
 

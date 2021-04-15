@@ -1,6 +1,6 @@
-
 """ ###################### EDGE ####################"""
 import numpy as np
+
 
 class g_edge:
     def __init__(self, node1, node2, node1_id, node2_id, traj):
@@ -32,7 +32,7 @@ class g_edge:
 
         :return:
         """
-        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)# + ' Cells: ' + str(self.Cells)
+        return ' Cost: ' + str(self.CostTotal) + ' Trains: ' + str(self.Trains)  # + ' Cells: ' + str(self.Cells)
 
     def setCosts(self):
         """
@@ -45,7 +45,7 @@ class g_edge:
         self.CostTransitionTimeTotal = 0
         self.CostTotal = 0
 
-        self.CollisionLockMatrix = np.zeros((len(self.Trains),len(self.Trains)),dtype=np.uint8)
+        self.CollisionLockMatrix = np.zeros((len(self.Trains), len(self.Trains)), dtype=np.uint8)
         for agent_pos_id, agent_id in enumerate(self.Trains):
             for c_agent_pos_id, c_agent_id in enumerate(self.Trains):
                 # if the train is not compared with itself and
@@ -59,15 +59,14 @@ class g_edge:
                     else:
                         tmp = np.zeros((self.TrainsTime[c_agent_pos_id][1] + 1))
 
-                    for i in range(self.TrainsTime[agent_pos_id][0], self.TrainsTime[agent_pos_id][1]+1):
+                    for i in range(self.TrainsTime[agent_pos_id][0], self.TrainsTime[agent_pos_id][1] + 1):
                         tmp[i] += 1
 
-                    for i in range(self.TrainsTime[c_agent_pos_id][0], self.TrainsTime[c_agent_pos_id][1]+1):
+                    for i in range(self.TrainsTime[c_agent_pos_id][0], self.TrainsTime[c_agent_pos_id][1] + 1):
                         tmp[i] += 1
 
                     if np.max(tmp) > 1 and self.TrainsTime[agent_pos_id][0] != 0:
                         self.CollisionLockMatrix[agent_pos_id][c_agent_pos_id] = 1
-
 
                     # find the max time for second Train
         # surely trains are on the same section
@@ -77,17 +76,16 @@ class g_edge:
         for i, item in enumerate(self.TrainsTime):
 
             if item[0] != 0:
-                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*10000 + abs(item[1] - item[0]))
+                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i]) * 10000 + abs(item[1] - item[0]))
                 self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 5000
 
             else:
-                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i])*10000 + abs(item[1] - item[0]))
+                self.CostPerTrain.append(np.count_nonzero(self.CollisionLockMatrix[i]) * 10000 + abs(item[1] - item[0]))
                 self.CostCollisionLockTotal += np.count_nonzero(self.CollisionLockMatrix[i]) * 5000
 
             self.CostTransitionTimeTotal += abs(item[1] - item[0])
 
         self.CostTotal = self.CostCollisionLockTotal + self.CostTransitionTimeTotal
-
 
 
 class g_vertex:
@@ -134,7 +132,6 @@ class Global_Graph:
 
         self.CostTotalEnv = cost
 
-
     def add_vertex(self, node):
         """
 
@@ -147,8 +144,6 @@ class Global_Graph:
             self.vert_dict[node] = new_vertex
             return new_vertex
         return self.vert_dict[node]
-
-
 
     def add_edge(self, frm, to, frm_id, to_id, traj):
         """
@@ -174,6 +169,7 @@ class Global_Graph:
             self.edge_ids.append(temp)
             return temp
 
+
 if __name__ == "__main__":
     # create a graph of 4 nodes
     #
@@ -182,21 +178,21 @@ if __name__ == "__main__":
     # if an edge is added - possibly two nodes will be added
     g = Global_Graph()
     g.add_vertex('a')
-    g.add_edge('a','b')
-    g.add_edge('a','c')
-    g.add_edge('b','c')
-    g.add_edge('b','d')
-    g.add_edge('c','d')
+    g.add_edge('a', 'b')
+    g.add_edge('a', 'c')
+    g.add_edge('b', 'c')
+    g.add_edge('b', 'd')
+    g.add_edge('c', 'd')
 
     source_vert = g.vert_dict['a']
     for edge in g.vert_dict['a'].edges:
         if edge.end == 'c':
-            edge.cost_triples.append([1,2,3])
-            #print("found")
-    #edge_temp = g.edge_dict['ab']
-    #edge_temp.cost_triples.append([1,2,3])
-    #g.add_vertex('b')
-    #g.add_vertex('c')
-    #g.add_vertex('d')
-    #g.add_vertex('e')
-    #print("done")
+            edge.cost_triples.append([1, 2, 3])
+            # print("found")
+    # edge_temp = g.edge_dict['ab']
+    # edge_temp.cost_triples.append([1,2,3])
+    # g.add_vertex('b')
+    # g.add_vertex('c')
+    # g.add_vertex('d')
+    # g.add_vertex('e')
+    # print("done")

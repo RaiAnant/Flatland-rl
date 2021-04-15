@@ -54,6 +54,7 @@ class Agent_Tree():
 
         self.avoid_starting_pos = avoid_starting_pos
 
+
         self.root = None  # root of the tree
         self.node_maps = {}
 
@@ -221,8 +222,7 @@ class Agent_Tree():
 
                         if start != idx:
 
-                            edge, dir = (
-                                obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1])], 1) \
+                            edge, dir = (obs.vertices[self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1])], 1) \
                                 if self.idx(node.path[start]) + "," + self.idx(node.path[idx - 1]) in obs.vertices else \
                                 (obs.vertices[self.idx(node.path[idx - 1]) + "," + self.idx(node.path[start])], 0)
 
@@ -373,8 +373,7 @@ def optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_
         observation_builder.cells_sequence[idx].append(agent.target)
         observation_builder.cells_sequence[idx].append((0, 0))
 
-    observation_builder.observations = observation_builder.populate_graph(
-        copy.deepcopy(observation_builder.base_graph))
+    observation_builder.observations = observation_builder.populate_graph()
     observation_builder.observations.setCosts()
     obs = observation_builder.observations
     return obs
