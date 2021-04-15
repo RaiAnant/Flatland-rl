@@ -98,7 +98,7 @@ def TL_detector(env, obs, actions):
             agent_obs_path = None
 
         obs_paths[idx] = agent_obs_path
-        
+
     return obs_paths
 
 
