@@ -1,20 +1,11 @@
 import numpy as np
-import time
-from flatland.envs.rail_generators import complex_rail_generator
-
-from flatland.envs.schedule_generators import complex_schedule_generator
 from flatland.envs.rail_env import RailEnv
 from flatland.utils.rendertools import RenderTool
-from flatland.envs.observations import GlobalObsForRailEnv
-from flatland.envs.malfunction_generators import malfunction_from_params
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
-import random
 from flatland.core.grid.grid4_utils import get_new_position
 import r2_solver
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
-
-from flatland.envs.observations import TreeObsForRailEnv
 import cv2
 import pickle
 
@@ -55,9 +46,6 @@ def naive_solver(env, obs):
             possible_transitions = env.rail.get_transitions(*agent.initial_position, agent.direction)
         num_transitions = np.count_nonzero(possible_transitions)
 
-        # Start from the current orientation, and see which transitions are available;
-        # organize them as [left, forward, right], relative to the current orientation
-        # If only one transition is possible, the forward branch is aligned with it.
         if num_transitions == 1:
             actions[idx] = 2
         else:
@@ -74,8 +62,8 @@ def naive_solver(env, obs):
     return actions
 
 
-def improved_solver(path_state):
-    return random.randint(0, 2)
+def improved_solver(path_state, experience):
+    return random.randint(0, 1)
 
 
 def TL_detector(env, obs, actions):
@@ -94,16 +82,13 @@ def TL_detector(env, obs, actions):
             agent_obs_path = transformer.transform_agent_observation(agent_obs_path)
             agent_obs_path = transformer.split_node_list(agent_obs_path, env.obs_builder.branches)
             agent_obs_path = transformer.filter_agent_obs(agent_obs_path)
+            print("agent")
         else:
             agent_obs_path = None
 
         obs_paths[idx] = agent_obs_path
 
     return obs_paths
-
-
-
-
 
 
 def solve(env, width, height, naive, predictor):
@@ -125,25 +110,21 @@ def solve(env, width, height, naive, predictor):
         else:
             _action = solver.GetMoves(env.agents, obs)
 
+
+        obs_paths = TL_detector(env, obs, _action)
+        for k in obs_paths.keys():
+            if obs_paths[k] is not None and improved_solver(obs_paths[k])==0:
+                _action[k] = 4
+
         for k in _action.keys():
             if env.agents[k].position is None:
                 continue
 
             pos = (env.agents[k].position[0], env.agents[k].position[1], env.agents[k].direction)
-            if _action[k] != 0 and pos in env.dev_pred_dict[k]:
+            if _action[k] != 0 and _action[k] != 4 and pos in env.dev_pred_dict[k]:
                 env.dev_pred_dict[k].remove(pos)
 
-
-
-        TL_detector(env, obs, _action)
-
-
-        # for k in _action.keys():
-        #     if _action[k] != 2:
-        #         print("fdasfds")
-
         next_obs, all_rewards, done, _ = env.step(_action)
-
 
         print("Rewards: {}, [done={}]".format(all_rewards, done))
         img = env_renderer.render_env(show=True, show_inactive_agents=False, show_predictions=True,
