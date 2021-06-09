@@ -45,12 +45,20 @@ def sumcs(cell_sequence):
     return sum
 
 if __name__ == "__main__":
-    NUMBER_OF_AGENTS = 5
+    # NUMBER_OF_AGENTS = 25
+    # width = 25
+    # height = 25
+    # max_prediction_depth = 300
+    # NUM_CITIES = 3
+    # SIGNAL_TIMER = 2
+
+    NUMBER_OF_AGENTS = 20
     width = 25
-    height = 25
+    height = 30
     max_prediction_depth = 300
-    NUM_CITIES = 2
+    NUM_CITIES = 4
     SIGNAL_TIMER = 2
+
     # problem
     # NUMBER_OF_AGENTS = 100
     # width = 25
@@ -78,7 +86,6 @@ if __name__ == "__main__":
 
 
 
-    SIGNAL_TIMER = 2
 
     test_env_file_path = None
 
@@ -133,8 +140,8 @@ if __name__ == "__main__":
                                   show_observations=True,
                                   frames=True,
                                   return_image=True)
-    # if find_alternate_paths:
-    #     obs = optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder)
+    if find_alternate_paths:
+        obs = optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_builder)
 
 
 
