@@ -58,19 +58,16 @@ class Agent_Tree():
         self.root = None  # root of the tree
         self.node_maps = {}
 
-    def build_tree(self, obs, env, pos=None, dir=None, node=None, hash=None, i=0):
+    def build_tree(self, obs, env, pos=None, dir=None, node=None, visited=None, i=0):
         # print(i)
-        if time.time() - start_time>TIME_THRESHOLD:
-            return True
+        # if time.time() - start_time>TIME_THRESHOLD:
+        #     return True
 
         agent = env.agents[self.agent_no]
 
         if pos is None:
 
-            pos = agent.position
-
-            if pos is None:
-                pos = agent.initial_position
+            pos = agent.initial_position if agent.position is None else agent.position
 
             dir = agent.direction
 
@@ -88,7 +85,7 @@ class Agent_Tree():
             else:
                 Agent_Tree.tree_map[(self.starting_pos, self.target, self.starting_direction)] = self.root
 
-            hash = {}  # to store visited postions for avioding loops in trees
+            visited = {}  # to store visited postions for avioding loops in trees
 
         # self.root.dist =
 
@@ -115,7 +112,7 @@ class Agent_Tree():
                         actions.append((idx + 1, direction))  # action will be a list of (action, direction)
 
             if len(
-                    actions) == 1:  # if only one action is possible, it is to remain in the same node (new node not encountered)
+                    actions) == 1:  # if only one action i s possible, it is to remain in the same node (new node not encountered)
 
                 if node.node_id != pos:  # add pos as a path to current node
                     node.add_cell_to_path(pos)
@@ -129,10 +126,10 @@ class Agent_Tree():
                 continue
 
             elif (pos[0], pos[1],
-                  dir) not in hash.keys():  # a node/fork has been reached, if the pos and direction exisits in has, it means this node has already been visited and is a loops
+                  dir) not in visited.keys():  # a node/fork has been reached, if the pos and direction exisits in has, it means this node has already been visited and is a loops
 
                 notLoop = False  # var to check for loops in tree
-                hash[(pos[0], pos[1], dir)] = 1  # marking the point as visited to avoid loops later
+                visited[(pos[0], pos[1], dir)] = 1  # marking the point as visited to avoid loops later
 
                 # transition is a list of (dist, action, direction) for all the possible routes in the current nod/fork
                 transitions = [(env.distance_map.get()[self.agent_no, get_new_position(pos, direction)[0],
@@ -145,8 +142,8 @@ class Agent_Tree():
 
                     _, action, direction = params
 
-                    if pos[0] == 12 and pos[1] == 5 and dir == 0:
-                        print("at the node for debug")
+                    # if pos[0] == 12 and pos[1] == 5 and dir == 0:
+                    #     print("at the node for debug")
 
                     if transitions[idx][0] - transitions[0][
                         0] > 51:  # if the current transition leads to a cost 40 greater than the first transtion (with the least cost), avoid it
@@ -165,13 +162,13 @@ class Agent_Tree():
                                                        action)])  # if the node for the given route already exists, add the node as a child
                         notLoop = True  # there is no loop
 
-                    elif self.build_tree(obs, env, new_position, new_direction, new_node, hash,
+                    elif self.build_tree(obs, env, new_position, new_direction, new_node, visited,
                                          i + 1):  # calulate the path from the node and see if it exists
                         self.node_maps[(pos[0], pos[1], dir, action)] = new_node  # add the new node the the map
                         node.add_child(new_node)  # add the node as child
                         notLoop = True
 
-                del hash[(pos[0], pos[1], dir)]
+                del visited[(pos[0], pos[1], dir)]
 
                 return notLoop
 
@@ -183,9 +180,9 @@ class Agent_Tree():
     def get_cost_of_traversal(self, node, obs):
         cost = 0
 
-        if time.time()-start_time > TIME_THRESHOLD:
-            node.min_flow_cost = 1000
-            return 1000
+        # if time.time()-start_time > TIME_THRESHOLD:
+        #     node.min_flow_cost = 1000
+        #     return 1000
 
         if node.min_flow_cost is not None:
             return node.min_flow_cost
@@ -338,20 +335,21 @@ def optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_
         Agent_Tree.starting_points.append(agent.initial_position)
 
     for idx, agent in enumerate(env.agents):
-        if time.time()-start_time > TIME_THRESHOLD:
-            break
+        # if time.time()-start_time > TIME_THRESHOLD:
+        #     break
+
         tree = Agent_Tree(idx, agent.initial_position)
         tree.build_tree(obs, env)
         tree_dict[idx] = tree
 
-        if time.time()-start_time > TIME_THRESHOLD:
-            break
+        # if time.time()-start_time > TIME_THRESHOLD:
+        #     break
 
         tree.optimize_path(obs)
         root = tree.root
 
-        if time.time()-start_time > TIME_THRESHOLD:
-            break
+        # if time.time()-start_time > TIME_THRESHOLD:
+        #     break
         temp_node = root
         observation_builder.cells_sequence[idx] = []
 
@@ -373,7 +371,7 @@ def optimize_all_agent_paths_for_min_flow_cost(env, obs, tree_dict, observation_
         observation_builder.cells_sequence[idx].append(agent.target)
         observation_builder.cells_sequence[idx].append((0, 0))
 
-    observation_builder.observations = observation_builder.populate_graph()
+    observation_builder.populate_graph()
     observation_builder.observations.setCosts()
     obs = observation_builder.observations
     return obs
